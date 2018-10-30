@@ -4,7 +4,10 @@ import akka.stream.QueueOfferResult
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.util.Timeout
 import software.amazon.kinesis.lifecycle.events._
-import software.amazon.kinesis.processor.{RecordProcessorCheckpointer, ShardRecordProcessor}
+import software.amazon.kinesis.processor.{
+  RecordProcessorCheckpointer,
+  ShardRecordProcessor
+}
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
@@ -92,37 +95,37 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
 
   def checkpointIfNeeded(checkpointer: RecordProcessorCheckpointer): Unit =
     blockAndTerminateOnFailure("checkpoint",
-      tracker.checkpointIfNeeded(checkpointer))
+                               tracker.checkpointIfNeeded(checkpointer))
 
-  def checkpointForShardEnd(
-                              checkpointer: RecordProcessorCheckpointer): Unit = {
+  def checkpointForShardEnd(checkpointer: RecordProcessorCheckpointer): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
     // wait for all in flight to be marked processed or stream failure (whichever occurs first)
     // we then use the .checkpoint() variant to checkpoint as this is required for shard end
-    val checkpointOnCompletion = tracker
+    val completion = tracker
       .watchCompletion(shutdownTimeout)
       .map(_ => {
         checkpointer.checkpoint()
         Done
       })
+      .recoverWith {
+        case _: Throwable => terminationFuture
+      }
 
-    val completion: Future[Done] =
-      Future.firstCompletedOf(Seq(checkpointOnCompletion, terminationFuture))
     blockAndTerminateOnFailure("checkpointAfterDrained", completion)
   }
 
-  def checkpointForShutdown(
-                             checkpointer: RecordProcessorCheckpointer): Unit = {
+  def checkpointForShutdown(checkpointer: RecordProcessorCheckpointer): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
-    // wait for all in flight to be marked processed or stream failure (whichever occurs first)
-    val checkpointOnCompletion = tracker
+    // wait for all in flight to be marked processed or stream failure, if that fails, wait on stream termination
+    val completion = tracker
       .watchCompletion(shutdownTimeout)
       .flatMap(_ => tracker.checkpoint(checkpointer))
+      .recoverWith {
+        case _: Throwable => terminationFuture
+      }
 
-    val completion: Future[Done] =
-      Future.firstCompletedOf(Seq(checkpointOnCompletion, terminationFuture))
     blockAndTerminateOnFailure("checkpointForShutdown", completion)
   }
 

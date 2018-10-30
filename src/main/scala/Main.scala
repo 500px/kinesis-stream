@@ -1,30 +1,30 @@
 import java.util.UUID
-import java.util.concurrent.TimeUnit
+import java.util.concurrent.ExecutorService
 
-import CheckpointTrackerActor.{CheckpointIfNeeded, Get, Process, Track}
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.stream.ActorMaterializer
 import akka.stream.scaladsl.{Keep, MergeHub, Sink}
-import akka.util.Timeout
 import akka.{Done, NotUsed}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
 import software.amazon.kinesis.common.ConfigsBuilder
-import software.amazon.kinesis.coordinator.Scheduler
-import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
+import software.amazon.kinesis.coordinator.SchedulerCoordinatorFactory._
+import software.amazon.kinesis.coordinator.{
+  Scheduler,
+  SchedulerCoordinatorFactory
+}
 
-import scala.collection.immutable.Iterable
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
 object Main extends App {
 
   implicit val system = ActorSystem("kinesis-source")
   implicit val ec = system.dispatcher
   implicit val mat = ActorMaterializer()
-  implicit val logging: LoggingAdapter = Logging(system, "HomeFeedIndexer")
+  implicit val logging: LoggingAdapter = Logging(system, "Example")
 
   // A simple consumer that will print to the console for now
   val consumer = Sink.foreach[String](s => logging.info(s))
@@ -104,6 +104,7 @@ object Main extends App {
       implicit ec: ExecutionContext,
       logging: LoggingAdapter): Future[Done] = {
     ec.execute(scheduler)
+
     terminationFuture
       .recoverWith {
         case ex: Throwable =>

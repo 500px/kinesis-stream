@@ -35,7 +35,7 @@ class CheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>
       val checkpointable = tracked.takeWhile(processed.contains)
-      log.info("CheckpointIfNeeded: {}", checkpointable.mkString("[",",", "]"))
+      log.info("CheckpointIfNeeded: {}", checkpointable.mkString("[", ",", "]"))
       checkpointable.lastOption.fold(sender() ! Ack) { s =>
         if (shouldCheckpoint() || force) {
           log.info("Checkpointing {}", shardId)

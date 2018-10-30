@@ -66,7 +66,8 @@ class CheckPointTracker(workerId: String,
   private def mapAskTimeout[A]: PartialFunction[Throwable, Future[A]] = {
     case _: AskTimeoutException =>
       Future.failed(
-        new CommitTimeoutException(s"Commit took longer than: $timeout for $shardId"))
+        new CommitTimeoutException(
+          s"Commit took longer than: $timeout for $shardId"))
     case other => Future.failed(other)
   }
 }
