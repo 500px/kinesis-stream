@@ -3,7 +3,7 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Keep, MergeHub, Sink}
+import akka.stream.scaladsl.Sink
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
@@ -33,7 +33,8 @@ object Main extends App {
   // Attach a MergeHub Source to the consumer. This will materialize to a
   // corresponding Sink.
   val runnableGraph =
-      KinesisConsumer.source(streamName, appName, workerId)
+    KinesisConsumer
+      .source(streamName, appName, workerId)
       .take(15)
       .mapAsyncUnordered(1)(r => r.markProcessed().map(_ => r))
       .map(r => s"${r.sequenceNumber} /${r.subSequenceNumber} - ${r.key}")
