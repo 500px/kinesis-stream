@@ -26,7 +26,7 @@ object Main extends App {
   implicit val cloudWatchClient =
     CloudWatchAsyncClient.builder.region(region).build()
   val streamName = "activity-test"
-  val appName = "test-kcl-2"
+  val appName = "test-kcl-3"
 
   val workerId = UUID.randomUUID().toString()
 

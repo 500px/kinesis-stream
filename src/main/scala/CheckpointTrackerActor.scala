@@ -47,6 +47,9 @@ class CheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
               processed --= checkpointable
               sender() ! Ack
             })
+        } else {
+          log.info("Skipping Checkpoint")
+          sender() ! Ack
         }
       }
       notifyIfCompleted()

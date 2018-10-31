@@ -18,7 +18,7 @@ val akkaStreamV = "2.5.14"
 
 val dependencySettings = Seq(
   libraryDependencies ++= Seq(
-    "software.amazon.kinesis" % "amazon-kinesis-client" % "2.0.1",
+    "software.amazon.kinesis" % "amazon-kinesis-client" % "2.0.4",
     "com.typesafe.akka" %% "akka-stream" % akkaStreamV,
     "com.typesafe.akka" %% "akka-slf4j" % akkaStreamV,
     "ch.qos.logback" % "logback-classic" % "1.2.3",
@@ -48,3 +48,7 @@ lazy val examples = (project in file("examples"))
   .dependsOn(root)
   .settings(scalaSettings)
   .settings(dependencySettings)
+  .settings(
+    resolvers += Resolver.bintrayRepo("streetcontxt", "maven"),
+    libraryDependencies += "com.streetcontxt" %% "kpl-scala" % "1.0.5"
+  )

@@ -22,7 +22,7 @@ class CheckPointTracker(workerId: String,
 
   terminationFuture.onComplete(_ => shutdown())
 
-  val timeout = Timeout(1, TimeUnit.SECONDS)
+  val timeout = Timeout(5, TimeUnit.SECONDS)
 
   def track(sequences: Iterable[ExtendedSequenceNumber]) = {
     tracker
