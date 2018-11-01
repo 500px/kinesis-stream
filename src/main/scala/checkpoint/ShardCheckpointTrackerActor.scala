@@ -101,7 +101,7 @@ object ShardCheckpointTrackerActor {
   case object WatchCompletion
   case object Completed
   case object Get
-  
+
   def props(shardId: String): Props =
     Props(classOf[ShardCheckpointTrackerActor], shardId)
 }

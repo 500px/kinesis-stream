@@ -9,6 +9,8 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
 import software.amazon.kinesis.common.ConfigsBuilder
 import software.amazon.kinesis.coordinator.Scheduler
+import software.amazon.kinesis.lifecycle.{TaskExecutionListener, TaskType}
+import software.amazon.kinesis.lifecycle.events.TaskExecutionListenerInput
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
@@ -96,7 +98,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       configsBuilder.checkpointConfig(),
       configsBuilder.coordinatorConfig(),
       configsBuilder.leaseManagementConfig(),
-      configsBuilder.lifecycleConfig(),
+      configsBuilder.lifecycleConfig().taskExecutionListener(new ShardShutdownListener(tracker)),
       configsBuilder.metricsConfig(),
       configsBuilder
         .processorConfig()
@@ -120,4 +122,16 @@ object StreamScheduler {
       logging: LoggingAdapter): StreamScheduler =
     new StreamScheduler(streamName, appName, workerId)(publishSink,
                                                        terminationFuture)
+}
+
+class ShardShutdownListener(tracker: CheckpointTracker) extends TaskExecutionListener {
+  override def beforeTaskExecution(input: TaskExecutionListenerInput): Unit = ()
+
+  override def afterTaskExecution(input: TaskExecutionListenerInput): Unit = {
+    if (input.taskType() == TaskType.SHUTDOWN || input.taskType() == TaskType.SHUTDOWN_COMPLETE) {
+      // note: we are just doing a fire and forget shutdown
+      // there is a final cleanup as part of the scheduler shut down
+      tracker.shutdown(input.shardInfo().shardId())
+    }
+  }
 }
