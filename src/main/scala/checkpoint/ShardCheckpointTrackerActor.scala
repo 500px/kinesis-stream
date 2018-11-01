@@ -1,15 +1,17 @@
+package checkpoint
+
 import java.time.Instant
 
-import CheckpointTrackerActor._
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
+import checkpoint.ShardCheckpointTrackerActor.{CheckpointIfNeeded, Get, Process, Track, WatchCompletion, _}
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.{Iterable, SortedSet}
 import scala.util.Try
 
-class CheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
+class ShardCheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
   implicit val ordering =
     Ordering.fromLessThan[ExtendedSequenceNumber]((a, b) => a.compareTo(b) < 0)
 
@@ -20,7 +22,6 @@ class CheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
   var timeSinceLastCheckpoint = Instant.now().getEpochSecond
   var watchers: List[ActorRef] = List.empty[ActorRef]
 
-  // TODO handle shutdown
 
   override def receive: Receive = {
     case Track(sequenceNumbers) =>
@@ -38,7 +39,7 @@ class CheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
       log.info("CheckpointIfNeeded: {}", checkpointable.mkString("[", ",", "]"))
       checkpointable.lastOption.fold(sender() ! Ack) { s =>
         if (shouldCheckpoint() || force) {
-          log.info("Checkpointing {}", shardId)
+          log.info("Checkpointing(forced={}) {}", force, shardId)
           // we absorb the exceptions so we don't lose state for this actor
           Try(
             checkpointer.checkpoint(s.sequenceNumber(), s.subSequenceNumber()))
@@ -79,7 +80,8 @@ class CheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
   }
 
   def notifyIfCompleted() = {
-    if (isCompleted()) {
+    if (isCompleted() && watchers.nonEmpty) {
+      log.info("Notifying completion for {}", shardId)
       watchers.foreach(ref => ref ! Completed)
       watchers = List.empty[ActorRef]
     }
@@ -90,7 +92,7 @@ class CheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
   }
 }
 
-object CheckpointTrackerActor {
+object ShardCheckpointTrackerActor {
   case object Ack
   case class Track(sequenceNumbers: Iterable[ExtendedSequenceNumber])
   case class Process(sequenceNumber: ExtendedSequenceNumber)
@@ -99,7 +101,7 @@ object CheckpointTrackerActor {
   case object WatchCompletion
   case object Completed
   case object Get
-  case object Tick
+  
   def props(shardId: String): Props =
-    Props(classOf[CheckpointTrackerActor], shardId)
+    Props(classOf[ShardCheckpointTrackerActor], shardId)
 }

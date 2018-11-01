@@ -3,6 +3,7 @@ import akka.event.LoggingAdapter
 import akka.stream.ActorMaterializer
 import akka.{Done, NotUsed}
 import akka.stream.scaladsl.Sink
+import checkpoint.CheckpointTracker
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
@@ -23,8 +24,8 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
 
   // TODO: incorporate kill switch - Should shut down worker,  should be triggered by record processors when failure occurs
   // TODO: Use workerstatechangelistener for shutdown future
-  // TODO: Implement non actor based checkpoint tracker
 
+  private val tracker = CheckpointTracker(workerId)
   private val scheduler: Scheduler =
     createScheduler(streamName,
                     appName,
@@ -44,24 +45,27 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       .recoverWith {
         case ex: Throwable =>
           logging.error(ex, "Shutting down Scheduler due to failure")
-          shutdownScheduler(scheduler)
+          shutdown(scheduler)
       }
       .flatMap(_ =>
         if (!scheduler.gracefuleShutdownStarted()) {
           logging.info("Shutting down Scheduler due to stream completion")
-          shutdownScheduler(scheduler)
+          shutdown(scheduler)
         } else Future.successful(Done))
   }
 
-  private def shutdownScheduler(scheduler: Scheduler)(
+  private def shutdown(scheduler: Scheduler)(
       implicit ec: ExecutionContext): Future[Done] = {
     // TODO: Use workerSTateChangeListener
-    Future {
+    val done = Future {
       blocking {
         scheduler.createGracefulShutdownCallable().call()
         Done
       }
     }
+
+    done.foreach(_ => tracker.shutdown())
+    done
   }
 
   private def createScheduler(streamName: String,
@@ -73,6 +77,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       publishSink: Sink[Record, NotUsed],
       terminationFuture: Future[Done]) = {
 
+
     val configsBuilder = new ConfigsBuilder(
       streamName,
       appName,
@@ -82,6 +87,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       workerId,
       new RecordProcessorFactoryImpl(publishSink,
                                      workerId,
+                                     tracker,
                                      terminationFuture,
                                      logging)(am, system, ec)
     )

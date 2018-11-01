@@ -3,11 +3,9 @@ import akka.event.LoggingAdapter
 import akka.stream.QueueOfferResult
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.util.Timeout
+import checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
-import software.amazon.kinesis.processor.{
-  RecordProcessorCheckpointer,
-  ShardRecordProcessor
-}
+import software.amazon.kinesis.processor.{RecordProcessorCheckpointer, ShardRecordProcessor}
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
@@ -16,14 +14,13 @@ import scala.concurrent.duration.{Duration, _}
 import scala.concurrent.{Await, Future}
 import scala.util.Try
 class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
-                          trackerFactory: String => CheckPointTracker,
+                          tracker: CheckpointTracker,
                           terminationFuture: Future[Done],
                           workerId: String,
                           logging: LoggingAdapter)
     extends ShardRecordProcessor {
 
   var shardId: String = _
-  var tracker: CheckPointTracker = _
   val shutdownTimeout = Timeout(2.minutes)
 
   override def initialize(initializationInput: InitializationInput): Unit = {
@@ -31,7 +28,6 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
                  initializationInput.shardId(),
                  workerId)
     shardId = initializationInput.shardId()
-    tracker = trackerFactory(shardId)
   }
 
   override def processRecords(
@@ -44,13 +40,13 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
 
   def transformRecords(
       kRecords: java.util.List[KinesisClientRecord]): Seq[Record] = {
-    kRecords.asScala.map(kr => Record.from(kr, tracker)).toIndexedSeq
+    kRecords.asScala.map(kr => Record.from(kr, shardId, tracker)).toIndexedSeq
   }
 
   def trackRecords(records: Seq[Record]): Unit =
     blockAndTerminateOnFailure(
       "trackRecords",
-      tracker.track(records.map(_.extendedSequenceNumber)))
+      tracker.track(shardId, records.map(_.extendedSequenceNumber)))
 
   def enqueueRecords(records: Seq[Record]) = {
 
@@ -95,7 +91,7 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
 
   def checkpointIfNeeded(checkpointer: RecordProcessorCheckpointer): Unit =
     blockAndTerminateOnFailure("checkpoint",
-                               tracker.checkpointIfNeeded(checkpointer))
+                               tracker.checkpointIfNeeded(shardId, checkpointer))
 
   def checkpointForShardEnd(checkpointer: RecordProcessorCheckpointer): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
@@ -103,7 +99,7 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
     // wait for all in flight to be marked processed or stream failure (whichever occurs first)
     // we then use the .checkpoint() variant to checkpoint as this is required for shard end
     val completion = tracker
-      .watchCompletion(shutdownTimeout)
+      .watchCompletion(shardId, shutdownTimeout)
       .map(_ => {
         checkpointer.checkpoint()
         Done
@@ -117,11 +113,11 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
 
   def checkpointForShutdown(checkpointer: RecordProcessorCheckpointer): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
-
+    logging.info("Starting checkpoint for Shutdown {}", shardId)
     // wait for all in flight to be marked processed or stream failure, if that fails, wait on stream termination
     val completion = tracker
-      .watchCompletion(shutdownTimeout)
-      .flatMap(_ => tracker.checkpoint(checkpointer))
+      .watchCompletion(shardId, shutdownTimeout)
+      .flatMap(_ => tracker.checkpoint(shardId, checkpointer))
       .recoverWith {
         case _: Throwable => terminationFuture
       }
