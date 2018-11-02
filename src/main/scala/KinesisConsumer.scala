@@ -1,7 +1,7 @@
 import akka.Done
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, KillSwitches}
 import akka.stream.scaladsl.{Keep, MergeHub, Source}
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
@@ -21,11 +21,13 @@ object KinesisConsumer {
       logging: LoggingAdapter): Source[Record, Future[Done]] = {
     MergeHub
       .source[Record](perProducerBufferSize = 1)
+      .viaMat(KillSwitches.single)(Keep.both)
       .watchTermination()(Keep.both)
       .mapMaterializedValue {
-        case (publishSink, terminationFuture) => {
+        case ((publishSink, killSwitch), terminationFuture) => {
           val scheduler =
             StreamScheduler(streamName, appName, workerId)(publishSink,
+                                                           killSwitch,
                                                            terminationFuture)
           scheduler.start()
         }

@@ -1,24 +1,21 @@
 import akka.Done
 import akka.event.LoggingAdapter
-import akka.stream.QueueOfferResult
 import akka.stream.scaladsl.SourceQueueWithComplete
+import akka.stream.{KillSwitch, QueueOfferResult}
 import akka.util.Timeout
 import checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
-import software.amazon.kinesis.processor.{
-  RecordProcessorCheckpointer,
-  ShardRecordProcessor
-}
+import software.amazon.kinesis.processor.{RecordProcessorCheckpointer, ShardRecordProcessor}
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
 import scala.concurrent.duration.{Duration, _}
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, Future}
 import scala.util.Try
 class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
                           tracker: CheckpointTracker,
-                          terminationFuture: Future[Done],
+                          killSwitch: KillSwitch,
                           workerId: String,
                           logging: LoggingAdapter)
     extends ShardRecordProcessor {
@@ -64,15 +61,18 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
         // Do nothing.
 
         case QueueOfferResult.Dropped =>
-          // terminate parent, should never be dropping messages
-          logging.error("Queue result dropped!")
+          // terminate stream, should never get into this condition
+          killSwitch.abort(new AssertionError(
+            "queue must use OverflowStrategy.Backpressure"
+          ))
         case QueueOfferResult.Failure(e) =>
-          // terminate parent
-          logging.error(e, "enqueue failure")
+          // failed to enqueue, fail stream
+          killSwitch.abort(e)
       }
     } catch {
       case ex: Throwable =>
-        logging.error(ex, "Queue Offer Future Failed")
+        // offer failed, kill stream
+        killSwitch.abort(ex)
     }
   }
 
@@ -131,27 +131,8 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
                                     future: Future[A]): Either[Throwable, A] = {
     Try(Await.result(future, Duration.Inf)).toEither.left.map { ex =>
       logging.error(ex, s"Failed on $name")
+      killSwitch.abort(ex)
       ex
-    }
-  }
-
-  /**
-    * Races two futures against eachother and runs flatmap using the function corresponding to the winner
-    * @param fut1
-    * @param fut2
-    * @param first - runs if future 1 finishes first
-    * @param second - runs if future 2 finishes first
-    * @param ec
-    * @tparam A
-    * @tparam B
-    * @return
-    */
-  def race2[A, B](fut1: Future[A], fut2: Future[A])(
-      first: A => Future[B],
-      second: A => Future[B])(implicit ec: ExecutionContext): Future[B] = {
-    Future.firstCompletedOf(Seq(fut1.map((1, _)), fut2.map((2, _)))).flatMap {
-      case (1, v) => first(v)
-      case (_, v) => second(v)
     }
   }
 

@@ -1,21 +1,18 @@
-import akka.{Done, NotUsed}
+import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
-import akka.stream.{ActorMaterializer, OverflowStrategy}
 import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.{ActorMaterializer, KillSwitch, OverflowStrategy}
 import checkpoint.CheckpointTracker
-import software.amazon.kinesis.processor.{
-  ShardRecordProcessor,
-  ShardRecordProcessorFactory
-}
+import software.amazon.kinesis.processor.{ShardRecordProcessor, ShardRecordProcessorFactory}
 
 import scala.collection.immutable.Seq
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class RecordProcessorFactoryImpl(sink: Sink[Record, NotUsed],
                                  workerId: String,
                                  checkpointTracker: CheckpointTracker,
-                                 terminationFuture: Future[Done],
+                                 killSwitch: KillSwitch,
                                  logging: LoggingAdapter)(
     implicit am: ActorMaterializer,
     system: ActorSystem,
@@ -29,7 +26,7 @@ class RecordProcessorFactoryImpl(sink: Sink[Record, NotUsed],
       .run()
     new RecordProcessorImpl(queue,
                             checkpointTracker,
-                            terminationFuture,
+                            killSwitch,
                             workerId,
                             logging)
   }

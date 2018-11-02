@@ -1,6 +1,6 @@
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
-import akka.stream.ActorMaterializer
+import akka.stream.{ActorMaterializer, KillSwitch}
 import akka.stream.scaladsl.Sink
 import akka.{Done, NotUsed}
 import checkpoint.CheckpointTracker
@@ -16,6 +16,7 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class StreamScheduler(streamName: String, appName: String, workerId: String)(
     publishSink: Sink[Record, NotUsed],
+    killSwitch: KillSwitch,
     terminationFuture: Future[Done])(implicit kinesisClient: KinesisAsyncClient,
                                      dynamoClient: DynamoDbAsyncClient,
                                      cloudwatchClient: CloudWatchAsyncClient,
@@ -34,11 +35,10 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
                     kinesisClient,
                     dynamoClient,
                     cloudwatchClient,
-                    workerId)(publishSink, terminationFuture)
+                    workerId)(publishSink, killSwitch)
 
   def start(): Future[Done] =
     startSchedulerAndRegisterShutdown(SchedulerExecutionContext.Global)
-
 
   private def startSchedulerAndRegisterShutdown(
       implicit ec: ExecutionContext): Future[Done] = {
@@ -78,8 +78,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
                               cloudwatchClient: CloudWatchAsyncClient,
                               workerId: String)(
       publishSink: Sink[Record, NotUsed],
-      terminationFuture: Future[Done]) = {
-
+      killSwitch: KillSwitch) = {
 
     val configsBuilder = new ConfigsBuilder(
       streamName,
@@ -91,7 +90,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       new RecordProcessorFactoryImpl(publishSink,
                                      workerId,
                                      tracker,
-                                     terminationFuture,
+                                     killSwitch,
                                      logging)(am, system, ec)
     )
 
@@ -99,7 +98,9 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       configsBuilder.checkpointConfig(),
       configsBuilder.coordinatorConfig(),
       configsBuilder.leaseManagementConfig(),
-      configsBuilder.lifecycleConfig().taskExecutionListener(new ShardShutdownListener(tracker)),
+      configsBuilder
+        .lifecycleConfig()
+        .taskExecutionListener(new ShardShutdownListener(tracker)),
       configsBuilder.metricsConfig(),
       configsBuilder
         .processorConfig()
@@ -113,6 +114,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
 object StreamScheduler {
   def apply(streamName: String, appName: String, workerId: String)(
       publishSink: Sink[Record, NotUsed],
+      killSwitch: KillSwitch,
       terminationFuture: Future[Done])(
       implicit kinesisClient: KinesisAsyncClient,
       dynamoClient: DynamoDbAsyncClient,
@@ -122,14 +124,17 @@ object StreamScheduler {
       ec: ExecutionContext,
       logging: LoggingAdapter): StreamScheduler =
     new StreamScheduler(streamName, appName, workerId)(publishSink,
+                                                       killSwitch,
                                                        terminationFuture)
 }
 
-class ShardShutdownListener(tracker: CheckpointTracker) extends TaskExecutionListener {
+class ShardShutdownListener(tracker: CheckpointTracker)
+    extends TaskExecutionListener {
   override def beforeTaskExecution(input: TaskExecutionListenerInput): Unit = ()
 
   override def afterTaskExecution(input: TaskExecutionListenerInput): Unit = {
-    if (input.taskType() == TaskType.SHUTDOWN || input.taskType() == TaskType.SHUTDOWN_COMPLETE) {
+    if (input.taskType() == TaskType.SHUTDOWN || input
+          .taskType() == TaskType.SHUTDOWN_COMPLETE) {
       // note: we are just doing a fire and forget shutdown
       // there is a final cleanup as part of the scheduler shut down
       tracker.shutdown(input.shardInfo().shardId())
