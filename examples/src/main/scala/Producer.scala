@@ -16,9 +16,9 @@ object Producer extends App {
 
   producer.send("1", ByteString("test").toByteBuffer)
 
-  Source(10 to 20).map(i => (i.toString, ByteString(s"Data Test: $i"))).mapAsync(1) {
+  Source(10 to 19).map(i => (i.toString, ByteString(s"Data Test: $i"))).mapAsync(1) {
     case (key, data) => producer.send(key, data.toByteBuffer)
-  }.runWith(Sink.foreach(println)).onComplete {
+  }.runWith(Sink.foreach(r => println(s"${r.getShardId}-${r.getSequenceNumber.takeRight(10)}"))).onComplete {
     case _ => system.terminate()
   }
 }

@@ -35,9 +35,9 @@ object Main extends App {
   val runnableGraph =
     KinesisConsumer
       .source(streamName, appName, workerId)
-      .take(10)
       .mapAsyncUnordered(1)(r => r.markProcessed().map(_ => r))
-      .map(r => s"${r.sequenceNumber} /${r.subSequenceNumber} - ${r.data.utf8String}")
+      .map(r => s"${r.sequenceNumber.takeRight(10)} /${r.shardId} - ${r.data.utf8String}")
+      .take(10)
       .to(consumer)
 
   val done = runnableGraph.run()

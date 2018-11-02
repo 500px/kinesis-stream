@@ -11,6 +11,7 @@ import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.Iterable
+import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 
 class CheckpointTracker(workerId: String)(

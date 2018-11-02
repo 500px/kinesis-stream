@@ -4,14 +4,23 @@ import java.time.Instant
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import checkpoint.ShardCheckpointTrackerActor.{CheckpointIfNeeded, Get, Process, Track, WatchCompletion, _}
+import checkpoint.ShardCheckpointTrackerActor.{
+  CheckpointIfNeeded,
+  Get,
+  Process,
+  Track,
+  WatchCompletion,
+  _
+}
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.{Iterable, SortedSet}
 import scala.util.Try
 
-class ShardCheckpointTrackerActor(shardId: String) extends Actor with ActorLogging {
+class ShardCheckpointTrackerActor(shardId: String)
+    extends Actor
+    with ActorLogging {
   implicit val ordering =
     Ordering.fromLessThan[ExtendedSequenceNumber]((a, b) => a.compareTo(b) < 0)
 
@@ -22,32 +31,40 @@ class ShardCheckpointTrackerActor(shardId: String) extends Actor with ActorLoggi
   var timeSinceLastCheckpoint = Instant.now().getEpochSecond
   var watchers: List[ActorRef] = List.empty[ActorRef]
 
-
   override def receive: Receive = {
     case Track(sequenceNumbers) =>
-      log.info("Tracking: {}", sequenceNumbers.mkString(","))
+      log.info("Tracking: {}", sequenceNumbers.map(_.sequenceNumber().takeRight(10)).mkString(","))
       tracked ++= sequenceNumbers
       sender() ! Ack
     case Process(sequenceNumber: ExtendedSequenceNumber)
         if tracked.contains(sequenceNumber) =>
-      log.info("Marked: {}", sequenceNumber)
+      log.info("Marked: {}", sequenceNumber.sequenceNumber().takeRight(10))
       processed += sequenceNumber
       sender() ! Ack
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>
       val checkpointable = tracked.takeWhile(processed.contains)
-      log.info("CheckpointIfNeeded: {}", checkpointable.mkString("[", ",", "]"))
+      log.info("CheckpointIfNeeded: {}",
+               checkpointable
+                 .map(_.sequenceNumber().takeRight(10))
+                 .mkString("[", ",", "]"))
       checkpointable.lastOption.fold(sender() ! Ack) { s =>
         if (shouldCheckpoint() || force) {
           log.info("Checkpointing(forced={}) {}", force, shardId)
           // we absorb the exceptions so we don't lose state for this actor
           Try(
             checkpointer.checkpoint(s.sequenceNumber(), s.subSequenceNumber()))
-            .fold(ex => sender() ! Failure(ex), _ => {
-              tracked --= checkpointable
-              processed --= checkpointable
-              sender() ! Ack
-            })
+            .fold(
+              ex => sender() ! Failure(ex),
+              _ => {
+                log.info("{} is at {}",
+                         shardId,
+                         s.sequenceNumber().takeRight(10))
+                tracked --= checkpointable
+                processed --= checkpointable
+                sender() ! Ack
+              }
+            )
         } else {
           log.info("Skipping Checkpoint")
           sender() ! Ack
@@ -93,7 +110,8 @@ class ShardCheckpointTrackerActor(shardId: String) extends Actor with ActorLoggi
   def notifyWatchersOfShutdown() = {
     if (!isCompleted() && watchers.nonEmpty) {
       log.info("Notifying failure to watchers for {}", shardId)
-      watchers.foreach(ref => ref ! Failure(new Exception("Watch failed. Reason: tracker shutdown")))
+      watchers.foreach(ref =>
+        ref ! Failure(new Exception("Watch failed. Reason: tracker shutdown")))
     } else {
       notifyIfCompleted()
     }

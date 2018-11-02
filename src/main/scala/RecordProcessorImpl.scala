@@ -5,13 +5,16 @@ import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.util.Timeout
 import checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
-import software.amazon.kinesis.processor.{RecordProcessorCheckpointer, ShardRecordProcessor}
+import software.amazon.kinesis.processor.{
+  RecordProcessorCheckpointer,
+  ShardRecordProcessor
+}
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
 import scala.concurrent.duration.{Duration, _}
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Try
 class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
                           tracker: CheckpointTracker,
@@ -90,37 +93,42 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
   }
 
   def checkpointIfNeeded(checkpointer: RecordProcessorCheckpointer): Unit =
-    blockAndTerminateOnFailure("checkpoint",
-                               tracker.checkpointIfNeeded(shardId, checkpointer))
+    blockAndTerminateOnFailure(
+      "checkpoint",
+      tracker.checkpointIfNeeded(shardId, checkpointer))
 
   def checkpointForShardEnd(checkpointer: RecordProcessorCheckpointer): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
 
-    // wait for all in flight to be marked processed or stream failure (whichever occurs first)
+    // wait for all in flight to be marked processed
     // we then use the .checkpoint() variant to checkpoint as this is required for shard end
+    // if we can't meet conditions to call .checkpoint(), then fail
 
     val completion = tracker
       .watchCompletion(shardId, shutdownTimeout)
-      .map(_ => {
+      .map { _ =>
         checkpointer.checkpoint()
         Done
-      })
-      .recoverWith {
-        case _: Throwable => terminationFuture
       }
 
-    blockAndTerminateOnFailure("checkpointAfterDrained", completion)
+    blockAndTerminateOnFailure("checkpointForShardEnd", completion)
   }
 
   def checkpointForShutdown(checkpointer: RecordProcessorCheckpointer): Unit = {
     import scala.concurrent.ExecutionContext.Implicits.global
     logging.info("Starting checkpoint for Shutdown {}", shardId)
     // wait for all in flight to be marked processed or stream failure, if that fails, wait on stream termination
-    val completion = tracker
-      .watchCompletion(shardId, shutdownTimeout)
-      .flatMap(_ => tracker.checkpoint(shardId, checkpointer))
-      .recoverWith {
-        case _: Throwable => terminationFuture
+
+    def checkpoint() = tracker.checkpoint(shardId, checkpointer)
+    val allProcessed = tracker.watchCompletion(shardId, shutdownTimeout)
+    // race between watch completion and stream completion
+    // if stream completion comes back first, we watch for completion again
+    val completion =
+      race2(allProcessed, terminationFuture)(
+        _ => checkpoint(),
+        _ => allProcessed.map(_ => checkpoint())
+      ).recover {
+        case _ => Done
       }
 
     blockAndTerminateOnFailure("checkpointForShutdown", completion)
@@ -133,4 +141,25 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
       ex
     }
   }
+
+  /**
+    * Races two futures against eachother and runs flatmap using the function corresponding to the winner
+    * @param fut1
+    * @param fut2
+    * @param first - runs if future 1 finishes first
+    * @param second - runs if future 2 finishes first
+    * @param ec
+    * @tparam A
+    * @tparam B
+    * @return
+    */
+  def race2[A, B](fut1: Future[A], fut2: Future[A])(
+      first: A => Future[B],
+      second: A => Future[B])(implicit ec: ExecutionContext): Future[B] = {
+    Future.firstCompletedOf(Seq(fut1.map((1, _)), fut2.map((2, _)))).flatMap {
+      case (1, v) => first(v)
+      case (_, v) => second(v)
+    }
+  }
+
 }
