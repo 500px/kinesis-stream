@@ -62,6 +62,9 @@ class ShardCheckpointTrackerActor(shardId: String) extends Actor with ActorLoggi
     case Get =>
       log.info("Tracked: {}", tracked.mkString(","))
       log.info("Processed: {}", processed.mkString(","))
+    case Shutdown =>
+      notifyWatchersOfShutdown()
+      context.stop(self)
   }
 
   override def postStop(): Unit = {
@@ -87,6 +90,15 @@ class ShardCheckpointTrackerActor(shardId: String) extends Actor with ActorLoggi
     }
   }
 
+  def notifyWatchersOfShutdown() = {
+    if (!isCompleted() && watchers.nonEmpty) {
+      log.info("Notifying failure to watchers for {}", shardId)
+      watchers.foreach(ref => ref ! Failure(new Exception("Watch failed. Reason: tracker shutdown")))
+    } else {
+      notifyIfCompleted()
+    }
+  }
+
   def isCompleted(): Boolean = {
     tracked.isEmpty || tracked.forall(processed.contains)
   }
@@ -101,6 +113,7 @@ object ShardCheckpointTrackerActor {
   case object WatchCompletion
   case object Completed
   case object Get
+  case object Shutdown
 
   def props(shardId: String): Props =
     Props(classOf[ShardCheckpointTrackerActor], shardId)

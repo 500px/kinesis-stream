@@ -21,7 +21,7 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
     extends ShardRecordProcessor {
 
   var shardId: String = _
-  val shutdownTimeout = Timeout(2.minutes)
+  val shutdownTimeout = Timeout(20.seconds)
 
   override def initialize(initializationInput: InitializationInput): Unit = {
     logging.info("Started Record Processor {} for Worker: {}",
@@ -98,6 +98,7 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
 
     // wait for all in flight to be marked processed or stream failure (whichever occurs first)
     // we then use the .checkpoint() variant to checkpoint as this is required for shard end
+
     val completion = tracker
       .watchCompletion(shardId, shutdownTimeout)
       .map(_ => {

@@ -1,16 +1,16 @@
 import akka.actor.ActorSystem
 import akka.event.LoggingAdapter
 import akka.stream.ActorMaterializer
-import akka.{Done, NotUsed}
 import akka.stream.scaladsl.Sink
+import akka.{Done, NotUsed}
 import checkpoint.CheckpointTracker
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
 import software.amazon.kinesis.common.ConfigsBuilder
 import software.amazon.kinesis.coordinator.Scheduler
-import software.amazon.kinesis.lifecycle.{TaskExecutionListener, TaskType}
 import software.amazon.kinesis.lifecycle.events.TaskExecutionListenerInput
+import software.amazon.kinesis.lifecycle.{TaskExecutionListener, TaskType}
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
@@ -25,9 +25,9 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
                                      logging: LoggingAdapter) {
 
   // TODO: incorporate kill switch - Should shut down worker,  should be triggered by record processors when failure occurs
-  // TODO: Use workerstatechangelistener for shutdown future
 
   private val tracker = CheckpointTracker(workerId)
+
   private val scheduler: Scheduler =
     createScheduler(streamName,
                     appName,
@@ -38,6 +38,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
 
   def start(): Future[Done] =
     startSchedulerAndRegisterShutdown(SchedulerExecutionContext.Global)
+
 
   private def startSchedulerAndRegisterShutdown(
       implicit ec: ExecutionContext): Future[Done] = {
@@ -58,7 +59,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
 
   private def shutdown(scheduler: Scheduler)(
       implicit ec: ExecutionContext): Future[Done] = {
-    // TODO: Use workerSTateChangeListener
+    // TODO: Use workerStateChangeListener
     val done = Future {
       blocking {
         scheduler.createGracefulShutdownCallable().call()

@@ -3,7 +3,7 @@ package checkpoint
 import java.util.concurrent.TimeUnit
 
 import akka.Done
-import akka.actor.ActorSystem
+import akka.actor.{Actor, ActorSystem}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import checkpoint.CheckpointTrackerActor._
@@ -16,6 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
 class CheckpointTracker(workerId: String)(
     implicit system: ActorSystem,
     ec: ExecutionContext) {
+
+  @volatile var isShutdown = false
 
   val tracker = system.actorOf(CheckpointTrackerActor.props(workerId),
     s"tracker-${workerId.take(5)}")
@@ -58,13 +60,18 @@ class CheckpointTracker(workerId: String)(
   }
 
   def shutdown(shardId: String): Future[Done] = {
-    tracker.ask(Shutdown(shardId))(timeout)
-      .map(_ => Done)
-      .recoverWith(mapAskTimeout("shutdown", shardId))
+    if (!isShutdown) {
+      tracker.ask(Shutdown(shardId))(timeout)
+        .map(_ => Done)
+        .recoverWith(mapAskTimeout("shutdown", shardId))
+    } else Future.successful(Done)
   }
 
   def shutdown(): Unit = {
-    system.stop(tracker)
+    if (!isShutdown) {
+      isShutdown = true
+      tracker.tell(Shutdown, Actor.noSender)
+    }
   }
 
   private def mapAskTimeout[A](name: String, shardId: String): PartialFunction[Throwable, Future[A]] = {

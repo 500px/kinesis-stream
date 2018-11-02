@@ -35,11 +35,14 @@ object Main extends App {
   val runnableGraph =
     KinesisConsumer
       .source(streamName, appName, workerId)
-      .take(15)
+      .take(10)
       .mapAsyncUnordered(1)(r => r.markProcessed().map(_ => r))
       .map(r => s"${r.sequenceNumber} /${r.subSequenceNumber} - ${r.data.utf8String}")
       .to(consumer)
 
   val done = runnableGraph.run()
-  done.onComplete(_ => logging.info("Shutdown completed"))
+  done.onComplete(_ => {
+    logging.info("Shutdown completed")
+    kinesisAsyncClient.close()
+  })
 }
