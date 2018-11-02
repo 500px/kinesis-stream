@@ -18,14 +18,14 @@ import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 import scala.collection.immutable.{Iterable, SortedSet}
 import scala.util.Try
 
-class ShardCheckpointTrackerActor(shardId: String)
+class ShardCheckpointTrackerActor(shardId: String,
+                                  maxBufferSize: Int,
+                                  maxDurationInSeconds: Int)
     extends Actor
     with ActorLogging {
   implicit val ordering =
     Ordering.fromLessThan[ExtendedSequenceNumber]((a, b) => a.compareTo(b) < 0)
 
-  val CheckpointMaxSize = 100000
-  val CheckpointDurationSeconds = 60
   var tracked = SortedSet.empty[ExtendedSequenceNumber]
   var processed = SortedSet.empty[ExtendedSequenceNumber]
   var timeSinceLastCheckpoint = Instant.now().getEpochSecond
@@ -33,12 +33,12 @@ class ShardCheckpointTrackerActor(shardId: String)
 
   override def receive: Receive = {
     case Track(sequenceNumbers) =>
-      log.info("Tracking: {}", sequenceNumbers.map(_.sequenceNumber().takeRight(10)).mkString(","))
+      log.info("Tracking: {}", sequenceNumbers.map(formatSeqNum).mkString(","))
       tracked ++= sequenceNumbers
       sender() ! Ack
     case Process(sequenceNumber: ExtendedSequenceNumber)
         if tracked.contains(sequenceNumber) =>
-      log.info("Marked: {}", sequenceNumber.sequenceNumber().takeRight(10))
+      log.info("Marked: {}", formatSeqNum(sequenceNumber))
       processed += sequenceNumber
       sender() ! Ack
       notifyIfCompleted()
@@ -46,7 +46,7 @@ class ShardCheckpointTrackerActor(shardId: String)
       val checkpointable = tracked.takeWhile(processed.contains)
       log.info("CheckpointIfNeeded: {}",
                checkpointable
-                 .map(_.sequenceNumber().takeRight(10))
+                 .map(formatSeqNum)
                  .mkString("[", ",", "]"))
       checkpointable.lastOption.fold(sender() ! Ack) { s =>
         if (shouldCheckpoint() || force) {
@@ -57,9 +57,7 @@ class ShardCheckpointTrackerActor(shardId: String)
             .fold(
               ex => sender() ! Failure(ex),
               _ => {
-                log.info("{} is at {}",
-                         shardId,
-                         s.sequenceNumber().takeRight(10))
+                log.info("{} is at {}", shardId, formatSeqNum(s))
                 tracked --= checkpointable
                 processed --= checkpointable
                 sender() ! Ack
@@ -92,11 +90,11 @@ class ShardCheckpointTrackerActor(shardId: String)
     haveReachedMaxTracked() || checkpointTimeElapsed()
   }
 
-  def haveReachedMaxTracked(): Boolean = tracked.size >= CheckpointMaxSize
+  def haveReachedMaxTracked(): Boolean = tracked.size >= maxBufferSize
   def checkpointTimeElapsed(): Boolean = {
     Instant
       .now()
-      .getEpochSecond - timeSinceLastCheckpoint >= CheckpointDurationSeconds
+      .getEpochSecond - timeSinceLastCheckpoint >= maxDurationInSeconds
   }
 
   def notifyIfCompleted() = {
@@ -120,6 +118,9 @@ class ShardCheckpointTrackerActor(shardId: String)
   def isCompleted(): Boolean = {
     tracked.isEmpty || tracked.forall(processed.contains)
   }
+
+  def formatSeqNum(es: ExtendedSequenceNumber): String =
+    es.sequenceNumber().takeRight(10)
 }
 
 object ShardCheckpointTrackerActor {
@@ -133,6 +134,8 @@ object ShardCheckpointTrackerActor {
   case object Get
   case object Shutdown
 
-  def props(shardId: String): Props =
-    Props(classOf[ShardCheckpointTrackerActor], shardId)
+  def props(shardId: String,
+            maxBufferSize: Int,
+            maxDurationInSeconds: Int): Props =
+    Props(classOf[ShardCheckpointTrackerActor], shardId, maxBufferSize, maxDurationInSeconds)
 }

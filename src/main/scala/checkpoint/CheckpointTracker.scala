@@ -11,16 +11,17 @@ import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.Iterable
-import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 
-class CheckpointTracker(workerId: String)(
-    implicit system: ActorSystem,
-    ec: ExecutionContext) {
+class CheckpointTracker(workerId: String,
+                        maxBufferSize: Int,
+                        maxDurationInSeconds: Int)(implicit system: ActorSystem,
+                                                   ec: ExecutionContext) {
 
   @volatile var isShutdown = false
 
-  val tracker = system.actorOf(CheckpointTrackerActor.props(workerId),
+  val tracker = system.actorOf(
+    CheckpointTrackerActor.props(workerId, maxBufferSize, maxDurationInSeconds),
     s"tracker-${workerId.take(5)}")
 
   val timeout = Timeout(5, TimeUnit.SECONDS)
@@ -29,7 +30,7 @@ class CheckpointTracker(workerId: String)(
     tracker
       .ask(Track(shardId, sequences))(timeout)
       .map(_ => Done)
-      .recoverWith(mapAskTimeout("track",shardId))
+      .recoverWith(mapAskTimeout("track", shardId))
   }
 
   def process(shardId: String, sequence: ExtendedSequenceNumber) = {
@@ -39,7 +40,8 @@ class CheckpointTracker(workerId: String)(
       .recoverWith(mapAskTimeout("process", shardId))
   }
 
-  def checkpointIfNeeded(shardId: String, checkpointer: RecordProcessorCheckpointer) = {
+  def checkpointIfNeeded(shardId: String,
+                         checkpointer: RecordProcessorCheckpointer) = {
     tracker
       .ask(CheckpointIfNeeded(shardId, checkpointer))(timeout)
       .map(_ => Done)
@@ -62,7 +64,8 @@ class CheckpointTracker(workerId: String)(
 
   def shutdown(shardId: String): Future[Done] = {
     if (!isShutdown) {
-      tracker.ask(Shutdown(shardId))(timeout)
+      tracker
+        .ask(Shutdown(shardId))(timeout)
         .map(_ => Done)
         .recoverWith(mapAskTimeout("shutdown", shardId))
     } else Future.successful(Done)
@@ -75,7 +78,9 @@ class CheckpointTracker(workerId: String)(
     }
   }
 
-  private def mapAskTimeout[A](name: String, shardId: String): PartialFunction[Throwable, Future[A]] = {
+  private def mapAskTimeout[A](
+      name: String,
+      shardId: String): PartialFunction[Throwable, Future[A]] = {
     case _: AskTimeoutException =>
       Future.failed(
         CheckpointTimeoutException(
@@ -84,8 +89,12 @@ class CheckpointTracker(workerId: String)(
   }
 }
 
-case class CheckpointTimeoutException(message: String) extends Exception(message)
+case class CheckpointTimeoutException(message: String)
+    extends Exception(message)
 
 object CheckpointTracker {
-  def apply(workerId: String)(implicit system: ActorSystem, ec: ExecutionContext) = new CheckpointTracker(workerId)
+  def apply(workerId: String, maxBufferSize: Int = 100000, maxDurationInSeconds: Int = 60)(
+      implicit system: ActorSystem,
+      ec: ExecutionContext) =
+    new CheckpointTracker(workerId, maxBufferSize, maxDurationInSeconds)
 }

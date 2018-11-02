@@ -12,14 +12,23 @@ import scala.concurrent.duration._
 import scala.collection.immutable.Iterable
 import scala.concurrent.Future
 
-class CheckpointTrackerActor(workerId: String) extends Actor with ActorLogging {
+class CheckpointTrackerActor(workerId: String,
+                             maxBufferSize: Int,
+                             maxDurationInSeconds: Int)
+    extends Actor
+    with ActorLogging {
   implicit val ec = context.dispatcher
 
   override def receive: Receive = {
-    case Track(shardId, sequenceNumbers) => shardTracker(shardId).forward(shard.Track(sequenceNumbers))
-    case Process(shardId, sequenceNumber) => shardTracker(shardId).forward(shard.Process(sequenceNumber))
-    case CheckpointIfNeeded(shardId, checkpointer, force) => shardTracker(shardId).forward(shard.CheckpointIfNeeded(checkpointer, force))
-    case WatchCompletion(shardId) => shardTracker(shardId).forward(shard.WatchCompletion)
+    case Track(shardId, sequenceNumbers) =>
+      shardTracker(shardId).forward(shard.Track(sequenceNumbers))
+    case Process(shardId, sequenceNumber) =>
+      shardTracker(shardId).forward(shard.Process(sequenceNumber))
+    case CheckpointIfNeeded(shardId, checkpointer, force) =>
+      shardTracker(shardId).forward(
+        shard.CheckpointIfNeeded(checkpointer, force))
+    case WatchCompletion(shardId) =>
+      shardTracker(shardId).forward(shard.WatchCompletion)
     case Shutdown(shardId) =>
       shutdownShardTracker(shardId)
       sender() ! Ack
@@ -30,7 +39,9 @@ class CheckpointTrackerActor(workerId: String) extends Actor with ActorLogging {
   }
 
   def shutdownChildren(): Future[ChildrenShutdownComplete.type] = {
-    Future.sequence(context.children.map(r => gracefulStop(r, 5.seconds, shard.Shutdown)))
+    Future
+      .sequence(
+        context.children.map(r => gracefulStop(r, 5.seconds, shard.Shutdown)))
       .map(_ => ChildrenShutdownComplete)
       .recover {
         case _ => ChildrenShutdownComplete
@@ -42,7 +53,10 @@ class CheckpointTrackerActor(workerId: String) extends Actor with ActorLogging {
   }
 
   def createShardTracker(shardId: String): ActorRef = {
-    context.actorOf(ShardCheckpointTrackerActor.props(shardId), shardId)
+    context.actorOf(ShardCheckpointTrackerActor.props(shardId,
+                                                      maxBufferSize,
+                                                      maxDurationInSeconds),
+                    shardId)
   }
 
   def shutdownShardTracker(shardId: String): Unit = {
@@ -56,9 +70,11 @@ class CheckpointTrackerActor(workerId: String) extends Actor with ActorLogging {
 
 object CheckpointTrackerActor {
   // commands
-  case class Track(shardId: String, sequenceNumbers: Iterable[ExtendedSequenceNumber])
+  case class Track(shardId: String,
+                   sequenceNumbers: Iterable[ExtendedSequenceNumber])
   case class Process(shardId: String, sequenceNumber: ExtendedSequenceNumber)
-  case class CheckpointIfNeeded(shardId: String, checkpointer: RecordProcessorCheckpointer,
+  case class CheckpointIfNeeded(shardId: String,
+                                checkpointer: RecordProcessorCheckpointer,
                                 force: Boolean = false)
   case class Shutdown(shardId: String)
   case object Shutdown
@@ -68,5 +84,11 @@ object CheckpointTrackerActor {
   // responses
   case object Ack
 
-  def props(workerId: String): Props = Props(classOf[CheckpointTrackerActor], workerId)
+  def props(workerId: String,
+            maxBufferSize: Int,
+            maxDurationInSeconds: Int): Props =
+    Props(classOf[CheckpointTrackerActor],
+          workerId,
+          maxBufferSize,
+          maxDurationInSeconds)
 }
