@@ -3,11 +3,13 @@ import java.util.UUID
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Sink
+import akka.stream.scaladsl.{Sink, Source}
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
+
+import scala.concurrent.Future
 
 object Main extends App {
 
@@ -39,6 +41,8 @@ object Main extends App {
       .map(r => s"${r.sequenceNumber.takeRight(10)} /${r.shardId} - ${r.data.utf8String}")
       .take(10)
       .to(consumer)
+
+  Source(1 to 10).mapAsync(1)(i => Future.successful(i)).take(10).to(Sink.foreach(s => logging.info(s.toString))).run()
 
   val done = runnableGraph.run()
   done.onComplete(_ => {

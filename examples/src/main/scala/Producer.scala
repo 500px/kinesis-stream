@@ -14,9 +14,7 @@ object Producer extends App {
 
   val producer = ScalaKinesisProducer("activity-test", new KinesisProducerConfiguration().setRegion("us-east-1").setCredentialsProvider(new DefaultAWSCredentialsProviderChain))
 
-  producer.send("1", ByteString("test").toByteBuffer)
-
-  Source(10 to 19).map(i => (i.toString, ByteString(s"Data Test: $i"))).mapAsync(1) {
+  Source(1 to 10).map(i => (i.toString, ByteString(s"Data: $i"))).mapAsync(1) {
     case (key, data) => producer.send(key, data.toByteBuffer)
   }.runWith(Sink.foreach(r => println(s"${r.getShardId}-${r.getSequenceNumber.takeRight(10)}"))).onComplete {
     case _ => system.terminate()
