@@ -81,7 +81,7 @@ class RecordProcessorImpl(
   }
 
   override def leaseLost(leaseLostInput: LeaseLostInput): Unit = {
-    logging.info("Lease lost: {}", shardId)
+    logging.debug("Lease lost: {}", shardId)
   }
 
   override def shardEnded(shardEndedInput: ShardEndedInput): Unit = {
@@ -91,7 +91,7 @@ class RecordProcessorImpl(
 
   override def shutdownRequested(
       shutdownRequestedInput: ShutdownRequestedInput): Unit = {
-    logging.info("Shutdown Requested: {}", shardId)
+    logging.debug("Shutdown Requested: {}", shardId)
     checkpointForShutdown(shutdownRequestedInput.checkpointer())
 
   }
