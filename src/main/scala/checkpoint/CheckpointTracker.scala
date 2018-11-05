@@ -12,11 +12,14 @@ import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.Iterable
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration._
 
 class CheckpointTracker(workerId: String,
                         maxBufferSize: Int,
-                        maxDurationInSeconds: Int)(implicit system: ActorSystem,
-                                                   ec: ExecutionContext) {
+                        maxDurationInSeconds: Int,
+                        completionTimeout: Timeout)(
+    implicit system: ActorSystem,
+    ec: ExecutionContext) {
 
   @volatile var isShutdown = false
 
@@ -26,6 +29,14 @@ class CheckpointTracker(workerId: String,
 
   val timeout = Timeout(5, TimeUnit.SECONDS)
 
+  /**
+    * Track a set of sequence numbers
+    * Note: process should be called on a member of this set
+    *
+    * @param shardId
+    * @param sequences
+    * @return
+    */
   def track(shardId: String, sequences: Iterable[ExtendedSequenceNumber]) = {
     tracker
       .ask(Track(shardId, sequences))(timeout)
@@ -33,6 +44,15 @@ class CheckpointTracker(workerId: String,
       .recoverWith(mapAskTimeout("track", shardId))
   }
 
+  /**
+    * Mark a sequence number as processed
+    *
+    * This sequence number is checkpointable if all sequence numbers before it are marked processed
+    * If a processed sequence number has no sequence numbers before it in the tracked set, it is considered checkpointable
+    * @param shardId
+    * @param sequence
+    * @return
+    */
   def process(shardId: String, sequence: ExtendedSequenceNumber) = {
     tracker
       .ask(Process(shardId, sequence))(timeout)
@@ -40,6 +60,12 @@ class CheckpointTracker(workerId: String,
       .recoverWith(mapAskTimeout("process", shardId))
   }
 
+  /**
+    * Checkpoint only if conditions are met (enough time elapsed or buffer is full)
+    * @param shardId
+    * @param checkpointer
+    * @return
+    */
   def checkpointIfNeeded(shardId: String,
                          checkpointer: RecordProcessorCheckpointer) = {
     tracker
@@ -48,6 +74,12 @@ class CheckpointTracker(workerId: String,
       .recoverWith(mapAskTimeout("checkpointIfNeeded", shardId))
   }
 
+  /**
+    * Forces checkpointing to occur for current highest checkpointable sequence number
+    * @param shardId
+    * @param checkpointer
+    * @return
+    */
   def checkpoint(shardId: String, checkpointer: RecordProcessorCheckpointer) = {
     tracker
       .ask(CheckpointIfNeeded(shardId, checkpointer, force = true))(timeout)
@@ -55,13 +87,24 @@ class CheckpointTracker(workerId: String,
       .recoverWith(mapAskTimeout("checkpoint", shardId))
   }
 
-  def watchCompletion(shardId: String, completionTimeout: Timeout) = {
+  /**
+    * Returns a future which resolves successfully when all in flight (tracked) messages are marked processed
+    * Fails if the underlying actor is shut down before the timeout elapses
+    * @param shardId
+    * @return
+    */
+  def watchCompletion(shardId: String) = {
     tracker
       .ask(WatchCompletion(shardId))(completionTimeout)
       .map(_ => Done)
       .recoverWith(mapAskTimeout("watchCompletion", shardId))
   }
 
+  /**
+    * Shuts down the tracker for a particular shard
+    * @param shardId
+    * @return
+    */
   def shutdown(shardId: String): Future[Done] = {
     if (!isShutdown) {
       tracker
@@ -71,6 +114,9 @@ class CheckpointTracker(workerId: String,
     } else Future.successful(Done)
   }
 
+  /**
+    * Shuts down tracker and all its shard trackers
+    */
   def shutdown(): Unit = {
     if (!isShutdown) {
       isShutdown = true
@@ -94,8 +140,23 @@ case class CheckpointTimeoutException(message: String)
 
 object CheckpointTracker {
   def apply(workerId: String,
-            maxBufferSize: Int = 100000,
-            maxDurationInSeconds: Int = 60)(implicit system: ActorSystem,
-                                            ec: ExecutionContext) =
-    new CheckpointTracker(workerId, maxBufferSize, maxDurationInSeconds)
+            maxBufferSize: Int,
+            maxDurationInSeconds: Int,
+            completionTimeout: Timeout)(implicit system: ActorSystem,
+                                        ec: ExecutionContext) =
+    new CheckpointTracker(workerId,
+                          maxBufferSize,
+                          maxDurationInSeconds,
+                          completionTimeout)
+  def apply(workerId: String, config: CheckpointConfig)(
+      implicit system: ActorSystem,
+      ec: ExecutionContext) =
+    new CheckpointTracker(workerId,
+                          config.maxBufferSize,
+                          config.maxDurationInSeconds,
+                          config.completionTimeout)
 }
+
+case class CheckpointConfig(completionTimeout: Timeout = Timeout(20.seconds),
+                            maxBufferSize: Int = 100000,
+                            maxDurationInSeconds: Int = 60)

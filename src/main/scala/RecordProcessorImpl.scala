@@ -2,7 +2,6 @@ import akka.Done
 import akka.event.LoggingAdapter
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{KillSwitch, QueueOfferResult}
-import akka.util.Timeout
 import checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
 import software.amazon.kinesis.processor.{
@@ -13,7 +12,7 @@ import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
-import scala.concurrent.duration.{Duration, _}
+import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Try
 class RecordProcessorImpl(
@@ -24,7 +23,6 @@ class RecordProcessorImpl(
     extends ShardRecordProcessor {
 
   var shardId: String = _
-  val shutdownTimeout = Timeout(20.seconds)
 
   override def initialize(initializationInput: InitializationInput): Unit = {
     logging.info("Started Record Processor {} for Worker: {}",
@@ -107,7 +105,7 @@ class RecordProcessorImpl(
     // if we can't meet conditions to call .checkpoint(), then fail
 
     val completion = tracker
-      .watchCompletion(shardId, shutdownTimeout)
+      .watchCompletion(shardId)
       .map { _ =>
         checkpointer.checkpoint()
         Done
@@ -121,7 +119,7 @@ class RecordProcessorImpl(
     // wait for all in flight to be marked processed
 
     val completion = tracker
-      .watchCompletion(shardId, shutdownTimeout)
+      .watchCompletion(shardId)
       .flatMap(_ => tracker.checkpoint(shardId, checkpointer))
       .recover { case _ => Done }
 

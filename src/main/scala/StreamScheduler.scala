@@ -3,7 +3,7 @@ import akka.event.Logging
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, KillSwitch}
 import akka.{Done, NotUsed}
-import checkpoint.CheckpointTracker
+import checkpoint.{CheckpointConfig, CheckpointTracker}
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
@@ -14,7 +14,10 @@ import software.amazon.kinesis.lifecycle.{TaskExecutionListener, TaskType}
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
-class StreamScheduler(streamName: String, appName: String, workerId: String)(
+class StreamScheduler(streamName: String,
+                      appName: String,
+                      workerId: String,
+                      checkpointConfig: CheckpointConfig)(
     publishSink: Sink[Record, NotUsed],
     killSwitch: KillSwitch,
     terminationFuture: Future[Done])(implicit kinesisClient: KinesisAsyncClient,
@@ -26,7 +29,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
 
   implicit val logging = Logging(system, "Kinesis")
 
-  private val tracker = CheckpointTracker(workerId)
+  private val tracker = CheckpointTracker(workerId, checkpointConfig)
 
   private val scheduler: Scheduler =
     createScheduler(streamName,
@@ -112,7 +115,10 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
 }
 
 object StreamScheduler {
-  def apply(streamName: String, appName: String, workerId: String)(
+  def apply(streamName: String,
+            appName: String,
+            workerId: String,
+            checkpointConfig: CheckpointConfig)(
       publishSink: Sink[Record, NotUsed],
       killSwitch: KillSwitch,
       terminationFuture: Future[Done])(
@@ -122,9 +128,10 @@ object StreamScheduler {
       am: ActorMaterializer,
       system: ActorSystem,
       ec: ExecutionContext): StreamScheduler =
-    new StreamScheduler(streamName, appName, workerId)(publishSink,
-                                                       killSwitch,
-                                                       terminationFuture)
+    new StreamScheduler(streamName, appName, workerId, checkpointConfig)(
+      publishSink,
+      killSwitch,
+      terminationFuture)
 }
 
 /**
