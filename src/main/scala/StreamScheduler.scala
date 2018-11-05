@@ -1,7 +1,7 @@
 import akka.actor.ActorSystem
-import akka.event.LoggingAdapter
-import akka.stream.{ActorMaterializer, KillSwitch}
+import akka.event.Logging
 import akka.stream.scaladsl.Sink
+import akka.stream.{ActorMaterializer, KillSwitch}
 import akka.{Done, NotUsed}
 import checkpoint.CheckpointTracker
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
@@ -22,10 +22,9 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
                                      cloudwatchClient: CloudWatchAsyncClient,
                                      am: ActorMaterializer,
                                      system: ActorSystem,
-                                     ec: ExecutionContext,
-                                     logging: LoggingAdapter) {
+                                     ec: ExecutionContext) {
 
-  // TODO: incorporate kill switch - Should shut down worker,  should be triggered by record processors when failure occurs
+  implicit val logging = Logging(system, "Kinesis")
 
   private val tracker = CheckpointTracker(workerId)
 
@@ -67,6 +66,8 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       }
     }
 
+    // shutdown tracker after the graceful shutdown of worker completes
+    // this ensures the tracker does not go down before shutdown based checkpointing for ShardConsumers happens
     done.foreach(_ => tracker.shutdown())
     done
   }
@@ -90,8 +91,7 @@ class StreamScheduler(streamName: String, appName: String, workerId: String)(
       new RecordProcessorFactoryImpl(publishSink,
                                      workerId,
                                      tracker,
-                                     killSwitch,
-                                     logging)(am, system, ec)
+                                     killSwitch)(am, ec, logging)
     )
 
     new Scheduler(
@@ -121,13 +121,17 @@ object StreamScheduler {
       cloudwatchClient: CloudWatchAsyncClient,
       am: ActorMaterializer,
       system: ActorSystem,
-      ec: ExecutionContext,
-      logging: LoggingAdapter): StreamScheduler =
+      ec: ExecutionContext): StreamScheduler =
     new StreamScheduler(streamName, appName, workerId)(publishSink,
                                                        killSwitch,
                                                        terminationFuture)
 }
 
+/**
+  * Used to detect when ShardRecordProcessors are shut down (due to shard end, lease lost.. etc)
+  * When this occurs, we can clean up the corresponding checkpoint tracker associated with the shard
+  * @param tracker
+  */
 class ShardShutdownListener(tracker: CheckpointTracker)
     extends TaskExecutionListener {
   override def beforeTaskExecution(input: TaskExecutionListenerInput): Unit = ()

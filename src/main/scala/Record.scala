@@ -21,7 +21,8 @@ case class Record(key: String,
 
 object Record {
   def from(kinesisRecord: KinesisClientRecord,
-           shardId: String, tracker: CheckpointTracker): Record = {
+           shardId: String,
+           tracker: CheckpointTracker): Record = {
 
     val extendedSequenceNumber = new ExtendedSequenceNumber(
       kinesisRecord.sequenceNumber(),

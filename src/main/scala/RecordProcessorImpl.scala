@@ -5,19 +5,22 @@ import akka.stream.{KillSwitch, QueueOfferResult}
 import akka.util.Timeout
 import checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
-import software.amazon.kinesis.processor.{RecordProcessorCheckpointer, ShardRecordProcessor}
+import software.amazon.kinesis.processor.{
+  RecordProcessorCheckpointer,
+  ShardRecordProcessor
+}
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
 import scala.concurrent.duration.{Duration, _}
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.util.Try
-class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
-                          tracker: CheckpointTracker,
-                          killSwitch: KillSwitch,
-                          workerId: String,
-                          logging: LoggingAdapter)
+class RecordProcessorImpl(
+    queue: SourceQueueWithComplete[Seq[Record]],
+    tracker: CheckpointTracker,
+    killSwitch: KillSwitch,
+    workerId: String)(implicit ec: ExecutionContext, logging: LoggingAdapter)
     extends ShardRecordProcessor {
 
   var shardId: String = _
@@ -62,9 +65,10 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
 
         case QueueOfferResult.Dropped =>
           // terminate stream, should never get into this condition
-          killSwitch.abort(new AssertionError(
-            "queue must use OverflowStrategy.Backpressure"
-          ))
+          killSwitch.abort(
+            new AssertionError(
+              "queue must use OverflowStrategy.Backpressure"
+            ))
         case QueueOfferResult.Failure(e) =>
           // failed to enqueue, fail stream
           killSwitch.abort(e)
@@ -98,8 +102,6 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
       tracker.checkpointIfNeeded(shardId, checkpointer))
 
   def checkpointForShardEnd(checkpointer: RecordProcessorCheckpointer): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
-
     // wait for all in flight to be marked processed
     // we then use the .checkpoint() variant to checkpoint as this is required for shard end
     // if we can't meet conditions to call .checkpoint(), then fail
@@ -115,7 +117,6 @@ class RecordProcessorImpl(queue: SourceQueueWithComplete[Seq[Record]],
   }
 
   def checkpointForShutdown(checkpointer: RecordProcessorCheckpointer): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     logging.info("Starting checkpoint for Shutdown {}", shardId)
     // wait for all in flight to be marked processed
 

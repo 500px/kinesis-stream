@@ -1,8 +1,7 @@
 import akka.Done
 import akka.actor.ActorSystem
-import akka.event.LoggingAdapter
-import akka.stream.{ActorMaterializer, KillSwitches}
 import akka.stream.scaladsl.{Keep, MergeHub, Source}
+import akka.stream.{ActorMaterializer, KillSwitches}
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
@@ -17,8 +16,7 @@ object KinesisConsumer {
       cloudwatchClient: CloudWatchAsyncClient,
       am: ActorMaterializer,
       system: ActorSystem,
-      ec: ExecutionContext,
-      logging: LoggingAdapter): Source[Record, Future[Done]] = {
+      ec: ExecutionContext): Source[Record, Future[Done]] = {
     MergeHub
       .source[Record](perProducerBufferSize = 1)
       .viaMat(KillSwitches.single)(Keep.both)

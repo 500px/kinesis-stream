@@ -137,5 +137,8 @@ object ShardCheckpointTrackerActor {
   def props(shardId: String,
             maxBufferSize: Int,
             maxDurationInSeconds: Int): Props =
-    Props(classOf[ShardCheckpointTrackerActor], shardId, maxBufferSize, maxDurationInSeconds)
+    Props(classOf[ShardCheckpointTrackerActor],
+          shardId,
+          maxBufferSize,
+          maxDurationInSeconds)
 }

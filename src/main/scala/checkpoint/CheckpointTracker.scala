@@ -93,8 +93,9 @@ case class CheckpointTimeoutException(message: String)
     extends Exception(message)
 
 object CheckpointTracker {
-  def apply(workerId: String, maxBufferSize: Int = 100000, maxDurationInSeconds: Int = 60)(
-      implicit system: ActorSystem,
-      ec: ExecutionContext) =
+  def apply(workerId: String,
+            maxBufferSize: Int = 100000,
+            maxDurationInSeconds: Int = 60)(implicit system: ActorSystem,
+                                            ec: ExecutionContext) =
     new CheckpointTracker(workerId, maxBufferSize, maxDurationInSeconds)
 }

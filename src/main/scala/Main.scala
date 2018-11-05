@@ -37,7 +37,8 @@ object Main extends App {
       .source(streamName, appName, workerId)
       .take(10)
       .mapAsyncUnordered(1)(r => r.markProcessed().map(_ => r))
-      .map(r => s"${r.sequenceNumber.takeRight(10)} /${r.shardId} - ${r.data.utf8String}")
+      .map(r =>
+        s"${r.sequenceNumber.takeRight(10)} /${r.shardId} - ${r.data.utf8String}")
       .to(consumer)
 
   val done = runnableGraph.run()

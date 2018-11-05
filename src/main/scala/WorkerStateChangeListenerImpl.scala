@@ -5,7 +5,8 @@ import software.amazon.kinesis.coordinator.WorkerStateChangeListener.WorkerState
 
 import scala.concurrent.Promise
 
-class WorkerStateChangeListenerImpl(shutdownPromise: Promise[Done], logging: LoggingAdapter)
+class WorkerStateChangeListenerImpl(shutdownPromise: Promise[Done],
+                                    logging: LoggingAdapter)
     extends WorkerStateChangeListener {
   override def onWorkerStateChange(
       newState: WorkerStateChangeListener.WorkerState): Unit = {
