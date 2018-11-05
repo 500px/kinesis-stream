@@ -1,12 +1,12 @@
-package checkpoint
+package consumer.checkpoint
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import checkpoint.CheckpointTrackerActor._
+import consumer.checkpoint.CheckpointTrackerActor._
 import akka.pattern.gracefulStop
 import akka.pattern.pipe
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
-import checkpoint.{ShardCheckpointTrackerActor => shard}
+import consumer.checkpoint.{ShardCheckpointTrackerActor => shard}
 
 import scala.concurrent.duration._
 import scala.collection.immutable.Iterable

@@ -1,12 +1,11 @@
+package consumer
+
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, KillSwitch}
 import akka.{Done, NotUsed}
-import checkpoint.{CheckpointConfig, CheckpointTracker}
-import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
-import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
-import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
+import consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.common.ConfigsBuilder
 import software.amazon.kinesis.coordinator.Scheduler
 import software.amazon.kinesis.lifecycle.events.TaskExecutionListenerInput
@@ -14,30 +13,20 @@ import software.amazon.kinesis.lifecycle.{TaskExecutionListener, TaskType}
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
-class StreamScheduler(streamName: String,
-                      appName: String,
-                      workerId: String,
-                      checkpointConfig: CheckpointConfig)(
+class StreamScheduler(streamName: String, config: ConsumerConfig)(
     publishSink: Sink[Record, NotUsed],
     killSwitch: KillSwitch,
-    terminationFuture: Future[Done])(implicit kinesisClient: KinesisAsyncClient,
-                                     dynamoClient: DynamoDbAsyncClient,
-                                     cloudwatchClient: CloudWatchAsyncClient,
-                                     am: ActorMaterializer,
+    terminationFuture: Future[Done])(implicit am: ActorMaterializer,
                                      system: ActorSystem,
                                      ec: ExecutionContext) {
 
   implicit val logging = Logging(system, "Kinesis")
 
-  private val tracker = CheckpointTracker(workerId, checkpointConfig)
+  private val tracker =
+    CheckpointTracker(config.workerId, config.checkpointConfig)
 
   private val scheduler: Scheduler =
-    createScheduler(streamName,
-                    appName,
-                    kinesisClient,
-                    dynamoClient,
-                    cloudwatchClient,
-                    workerId)(publishSink, killSwitch)
+    createScheduler(streamName, config)(publishSink, killSwitch)
 
   def start(): Future[Done] =
     startSchedulerAndRegisterShutdown(SchedulerExecutionContext.Global)
@@ -75,24 +64,19 @@ class StreamScheduler(streamName: String,
     done
   }
 
-  private def createScheduler(streamName: String,
-                              appName: String,
-                              kinesisClient: KinesisAsyncClient,
-                              dynamoClient: DynamoDbAsyncClient,
-                              cloudwatchClient: CloudWatchAsyncClient,
-                              workerId: String)(
+  private def createScheduler(streamName: String, config: ConsumerConfig)(
       publishSink: Sink[Record, NotUsed],
       killSwitch: KillSwitch) = {
 
     val configsBuilder = new ConfigsBuilder(
       streamName,
-      appName,
-      kinesisClient,
-      dynamoClient,
-      cloudwatchClient,
-      workerId,
+      config.name,
+      config.kinesisClient,
+      config.dynamoClient,
+      config.cloudwatchClient,
+      config.workerId,
       new RecordProcessorFactoryImpl(publishSink,
-                                     workerId,
+                                     config.workerId,
                                      tracker,
                                      killSwitch)(am, ec, logging)
     )
@@ -115,28 +99,20 @@ class StreamScheduler(streamName: String,
 }
 
 object StreamScheduler {
-  def apply(streamName: String,
-            appName: String,
-            workerId: String,
-            checkpointConfig: CheckpointConfig)(
+  def apply(streamName: String, config: ConsumerConfig)(
       publishSink: Sink[Record, NotUsed],
       killSwitch: KillSwitch,
-      terminationFuture: Future[Done])(
-      implicit kinesisClient: KinesisAsyncClient,
-      dynamoClient: DynamoDbAsyncClient,
-      cloudwatchClient: CloudWatchAsyncClient,
-      am: ActorMaterializer,
-      system: ActorSystem,
-      ec: ExecutionContext): StreamScheduler =
-    new StreamScheduler(streamName, appName, workerId, checkpointConfig)(
-      publishSink,
-      killSwitch,
-      terminationFuture)
+      terminationFuture: Future[Done])(implicit am: ActorMaterializer,
+                                       system: ActorSystem,
+                                       ec: ExecutionContext): StreamScheduler =
+    new StreamScheduler(streamName, config)(publishSink,
+                                            killSwitch,
+                                            terminationFuture)
 }
 
 /**
   * Used to detect when ShardRecordProcessors are shut down (due to shard end, lease lost.. etc)
-  * When this occurs, we can clean up the corresponding checkpoint tracker associated with the shard
+  * When this occurs, we can clean up the corresponding consumer.checkpoint tracker associated with the shard
   * @param tracker
   */
 class ShardShutdownListener(tracker: CheckpointTracker)

@@ -1,8 +1,10 @@
+package consumer
+
 import akka.Done
 import akka.event.LoggingAdapter
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{KillSwitch, QueueOfferResult}
-import checkpoint.CheckpointTracker
+import consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
 import software.amazon.kinesis.processor.{
   RecordProcessorCheckpointer,
@@ -25,7 +27,7 @@ class RecordProcessorImpl(
   var shardId: String = _
 
   override def initialize(initializationInput: InitializationInput): Unit = {
-    logging.info("Started Record Processor {} for Worker: {}",
+    logging.info("Started consumer.Record Processor {} for Worker: {}",
                  initializationInput.shardId(),
                  workerId)
     shardId = initializationInput.shardId()
@@ -96,13 +98,13 @@ class RecordProcessorImpl(
 
   def checkpointIfNeeded(checkpointer: RecordProcessorCheckpointer): Unit =
     blockAndTerminateOnFailure(
-      "checkpoint",
+      "consumer/checkpoint",
       tracker.checkpointIfNeeded(shardId, checkpointer))
 
   def checkpointForShardEnd(checkpointer: RecordProcessorCheckpointer): Unit = {
     // wait for all in flight to be marked processed
-    // we then use the .checkpoint() variant to checkpoint as this is required for shard end
-    // if we can't meet conditions to call .checkpoint(), then fail
+    // we then use the .consumer.checkpoint() variant to consumer.checkpoint as this is required for shard end
+    // if we can't meet conditions to call .consumer.checkpoint(), then fail
 
     val completion = tracker
       .watchCompletion(shardId)
@@ -115,7 +117,7 @@ class RecordProcessorImpl(
   }
 
   def checkpointForShutdown(checkpointer: RecordProcessorCheckpointer): Unit = {
-    logging.info("Starting checkpoint for Shutdown {}", shardId)
+    logging.info("Starting consumer.checkpoint for Shutdown {}", shardId)
     // wait for all in flight to be marked processed
 
     val completion = tracker

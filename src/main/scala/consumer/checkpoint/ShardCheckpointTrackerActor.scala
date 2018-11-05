@@ -1,10 +1,10 @@
-package checkpoint
+package consumer.checkpoint
 
 import java.time.Instant
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import checkpoint.ShardCheckpointTrackerActor.{
+import consumer.checkpoint.ShardCheckpointTrackerActor.{
   CheckpointIfNeeded,
   Get,
   Process,

@@ -1,3 +1,5 @@
+package consumer
+
 import java.util.concurrent.Executors
 
 import com.google.common.util.concurrent.ThreadFactoryBuilder

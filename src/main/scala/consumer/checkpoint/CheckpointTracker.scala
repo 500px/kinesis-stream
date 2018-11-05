@@ -1,4 +1,4 @@
-package checkpoint
+package consumer.checkpoint
 
 import java.util.concurrent.TimeUnit
 
@@ -6,7 +6,7 @@ import akka.Done
 import akka.actor.{Actor, ActorSystem}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
-import checkpoint.CheckpointTrackerActor._
+import consumer.checkpoint.CheckpointTrackerActor._
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
@@ -84,7 +84,7 @@ class CheckpointTracker(workerId: String,
     tracker
       .ask(CheckpointIfNeeded(shardId, checkpointer, force = true))(timeout)
       .map(_ => Done)
-      .recoverWith(mapAskTimeout("checkpoint", shardId))
+      .recoverWith(mapAskTimeout("consumer/checkpoint", shardId))
   }
 
   /**

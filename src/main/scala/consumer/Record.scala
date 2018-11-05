@@ -1,8 +1,10 @@
+package consumer
+
 import java.time.Instant
 
 import akka.Done
 import akka.util.ByteString
-import checkpoint.CheckpointTracker
+import consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
