@@ -33,24 +33,24 @@ class ShardCheckpointTrackerActor(shardId: String,
 
   override def receive: Receive = {
     case Track(sequenceNumbers) =>
-      log.info("Tracking: {}", sequenceNumbers.map(formatSeqNum).mkString(","))
+      log.debug("Tracking: {}", sequenceNumbers.map(formatSeqNum).mkString(","))
       tracked ++= sequenceNumbers
       sender() ! Ack
     case Process(sequenceNumber: ExtendedSequenceNumber)
         if tracked.contains(sequenceNumber) =>
-      log.info("Marked: {}", formatSeqNum(sequenceNumber))
+      log.debug("Marked: {}", formatSeqNum(sequenceNumber))
       processed += sequenceNumber
       sender() ! Ack
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>
       val checkpointable = tracked.takeWhile(processed.contains)
-      log.info("CheckpointIfNeeded: {}",
+      log.debug("CheckpointIfNeeded: {}",
                checkpointable
                  .map(formatSeqNum)
                  .mkString("[", ",", "]"))
       checkpointable.lastOption.fold(sender() ! Ack) { s =>
         if (shouldCheckpoint() || force) {
-          log.info("Checkpointing(forced={}) {}", force, shardId)
+          log.debug("Checkpointing(forced={}) {}", force, shardId)
           // we absorb the exceptions so we don't lose state for this actor
           Try(
             checkpointer.checkpoint(s.sequenceNumber(), s.subSequenceNumber()))
