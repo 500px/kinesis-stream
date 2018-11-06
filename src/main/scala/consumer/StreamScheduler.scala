@@ -13,7 +13,7 @@ import software.amazon.kinesis.lifecycle.{TaskExecutionListener, TaskType}
 
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
-class StreamScheduler(streamName: String, config: ConsumerConfig)(
+class StreamScheduler(config: ConsumerConfig)(
     publishSink: Sink[Record, NotUsed],
     killSwitch: KillSwitch,
     terminationFuture: Future[Done])(implicit am: ActorMaterializer,
@@ -26,7 +26,7 @@ class StreamScheduler(streamName: String, config: ConsumerConfig)(
     CheckpointTracker(config.workerId, config.checkpointConfig)
 
   private val scheduler: Scheduler =
-    createScheduler(streamName, config)(publishSink, killSwitch)
+    createScheduler(config)(publishSink, killSwitch)
 
   def start(): Future[Done] =
     startSchedulerAndRegisterShutdown(SchedulerExecutionContext.Global)
@@ -64,13 +64,13 @@ class StreamScheduler(streamName: String, config: ConsumerConfig)(
     done
   }
 
-  private def createScheduler(streamName: String, config: ConsumerConfig)(
+  private def createScheduler(config: ConsumerConfig)(
       publishSink: Sink[Record, NotUsed],
       killSwitch: KillSwitch) = {
 
     val configsBuilder = new ConfigsBuilder(
-      streamName,
-      config.name,
+      config.streamName,
+      config.appName,
       config.kinesisClient,
       config.dynamoClient,
       config.cloudwatchClient,
@@ -83,31 +83,32 @@ class StreamScheduler(streamName: String, config: ConsumerConfig)(
 
     new Scheduler(
       configsBuilder.checkpointConfig(),
-      configsBuilder.coordinatorConfig(),
-      configsBuilder.leaseManagementConfig(),
+      config.coordinatorConfig.getOrElse(configsBuilder.coordinatorConfig()),
+      config.leaseManagementConfig.getOrElse(
+        configsBuilder.leaseManagementConfig()),
       configsBuilder
         .lifecycleConfig()
         .taskExecutionListener(new ShardShutdownListener(tracker)),
-      configsBuilder.metricsConfig(),
+      config.metricsConfig.getOrElse(configsBuilder.metricsConfig()),
       configsBuilder
         .processorConfig()
         .callProcessRecordsEvenForEmptyRecordList(true),
-      configsBuilder.retrievalConfig()
+      configsBuilder
+        .retrievalConfig()
+        .initialPositionInStreamExtended(config.initialPositionInStreamExtended)
     )
   }
 
 }
 
 object StreamScheduler {
-  def apply(streamName: String, config: ConsumerConfig)(
-      publishSink: Sink[Record, NotUsed],
-      killSwitch: KillSwitch,
-      terminationFuture: Future[Done])(implicit am: ActorMaterializer,
-                                       system: ActorSystem,
-                                       ec: ExecutionContext): StreamScheduler =
-    new StreamScheduler(streamName, config)(publishSink,
-                                            killSwitch,
-                                            terminationFuture)
+  def apply(config: ConsumerConfig)(publishSink: Sink[Record, NotUsed],
+                                    killSwitch: KillSwitch,
+                                    terminationFuture: Future[Done])(
+      implicit am: ActorMaterializer,
+      system: ActorSystem,
+      ec: ExecutionContext): StreamScheduler =
+    new StreamScheduler(config)(publishSink, killSwitch, terminationFuture)
 }
 
 /**

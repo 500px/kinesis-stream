@@ -45,9 +45,9 @@ class ShardCheckpointTrackerActor(shardId: String,
     case CheckpointIfNeeded(checkpointer, force) =>
       val checkpointable = tracked.takeWhile(processed.contains)
       log.debug("CheckpointIfNeeded: {}",
-               checkpointable
-                 .map(formatSeqNum)
-                 .mkString("[", ",", "]"))
+                checkpointable
+                  .map(formatSeqNum)
+                  .mkString("[", ",", "]"))
       checkpointable.lastOption.fold(sender() ! Ack) { s =>
         if (shouldCheckpoint() || force) {
           log.debug("Checkpointing(forced={}) {}", force, shardId)

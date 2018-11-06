@@ -1,21 +1,33 @@
 package consumer
 
-import java.util.UUID
+import java.text.DateFormat
+import java.util.{Date, UUID}
 
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Keep, MergeHub, Source}
 import akka.stream.{ActorMaterializer, KillSwitches}
+import akka.util.Timeout
+import com.typesafe.config.Config
 import consumer.checkpoint.CheckpointConfig
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
+import software.amazon.kinesis.common.{
+  InitialPositionInStream,
+  InitialPositionInStreamExtended
+}
+import software.amazon.kinesis.coordinator.CoordinatorConfig
+import software.amazon.kinesis.leases.LeaseManagementConfig
+import software.amazon.kinesis.metrics.MetricsConfig
 
+import scala.concurrent.duration._
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future}
 
 object Consumer {
 
-  def source(streamName: String, config: ConsumerConfig)(
+  def source(config: ConsumerConfig)(
       implicit am: ActorMaterializer,
       system: ActorSystem,
       ec: ExecutionContext): Source[Record, Future[Done]] = {
@@ -27,9 +39,7 @@ object Consumer {
       .mapMaterializedValue {
         case ((publishSink, killSwitch), terminationFuture) => {
           val scheduler =
-            StreamScheduler(streamName, config)(publishSink,
-                                                killSwitch,
-                                                terminationFuture)
+            StreamScheduler(config)(publishSink, killSwitch, terminationFuture)
           scheduler.start()
         }
       }
@@ -39,18 +49,47 @@ object Consumer {
       implicit am: ActorMaterializer,
       system: ActorSystem,
       ec: ExecutionContext): Source[Record, Future[Done]] =
-    source(streamName, ConsumerConfig(appName))
+    source(ConsumerConfig(streamName, appName))
 }
 
-case class ConsumerConfig(name: String,
-                          workerId: String,
-                          checkpointConfig: CheckpointConfig,
-                          kinesisClient: KinesisAsyncClient,
-                          dynamoClient: DynamoDbAsyncClient,
-                          cloudwatchClient: CloudWatchAsyncClient)
+case class ConsumerConfig(
+    streamName: String,
+    appName: String,
+    workerId: String,
+    checkpointConfig: CheckpointConfig,
+    kinesisClient: KinesisAsyncClient,
+    dynamoClient: DynamoDbAsyncClient,
+    cloudwatchClient: CloudWatchAsyncClient,
+    initialPositionInStreamExtended: InitialPositionInStreamExtended =
+      InitialPositionInStreamExtended.newInitialPosition(
+        InitialPositionInStream.LATEST),
+    coordinatorConfig: Option[CoordinatorConfig] = None,
+    leaseManagementConfig: Option[LeaseManagementConfig] = None,
+    metricsConfig: Option[MetricsConfig] = None) {
+
+  def withInitialStreamPosition(
+      position: InitialPositionInStream): ConsumerConfig = {
+    this.copy(
+      initialPositionInStreamExtended =
+        InitialPositionInStreamExtended.newInitialPosition(position))
+  }
+
+  def withInitialStreamPositionAtTimestamp(time: Date): ConsumerConfig =
+    this.copy(
+      initialPositionInStreamExtended =
+        InitialPositionInStreamExtended.newInitialPositionAtTimestamp(time))
+
+  def withCoordinatorConfig(config: CoordinatorConfig): ConsumerConfig =
+    this.copy(coordinatorConfig = Some(config))
+
+  def withLeaseManagementConfig(config: LeaseManagementConfig): ConsumerConfig =
+    this.copy(leaseManagementConfig = Some(config))
+  def withMetricsConfig(config: MetricsConfig): ConsumerConfig =
+    this.copy(metricsConfig = Some(config))
+}
 
 object ConsumerConfig {
-  def apply(name: String): ConsumerConfig = {
+  def apply(streamName: String, appName: String): ConsumerConfig = {
 
     val kinesisClient =
       KinesisAsyncClient.builder.build()
@@ -58,12 +97,86 @@ object ConsumerConfig {
     val cloudWatchClient =
       CloudWatchAsyncClient.builder.build()
 
-    ConsumerConfig(name,
+    withNames(streamName, appName)(kinesisClient,
+                                   dynamoClient,
+                                   cloudWatchClient)
+  }
+
+  def withNames(streamName: String, appName: String)(
+      implicit kinesisAsyncClient: KinesisAsyncClient,
+      dynamoDbAsyncClient: DynamoDbAsyncClient,
+      cloudWatchAsyncClient: CloudWatchAsyncClient): ConsumerConfig =
+    ConsumerConfig(streamName,
+                   appName,
                    generateWorkerId(),
                    CheckpointConfig(),
+                   kinesisAsyncClient,
+                   dynamoDbAsyncClient,
+                   cloudWatchAsyncClient)
+
+  def fromConfig(config: Config)(
+      implicit kinesisAsyncClient: KinesisAsyncClient = null,
+      dynamoDbAsyncClient: DynamoDbAsyncClient = null,
+      cloudWatchAsyncClient: CloudWatchAsyncClient = null) = {
+    def getOpt[A](key: String, lookup: String => A): Option[A] =
+      if (config.hasPath(key)) Some(lookup(key)) else None
+    def getIntOpt(key: String) = getOpt(key, config.getInt)
+    def getStringOpt(key: String) = getOpt(key, config.getString)
+    def getDuration(key: String): FiniteDuration =
+      FiniteDuration(config.getDuration(key).toMillis, MILLISECONDS)
+    def getDurationOpt(key: String) = getOpt(key, getDuration)
+
+    val StreamPositionLatest = "latest"
+    val StreamPositionHorizon = "trim-horizon"
+    val StreamPositionTimestamp = "at-timestamp"
+
+    val streamName = config.getString("stream-name")
+    val name = config.getString("application-name")
+
+    val latestPos = InitialPositionInStreamExtended.newInitialPosition(
+      InitialPositionInStream.LATEST)
+
+    val streamPosition = getStringOpt("position.initial")
+      .map {
+        case StreamPositionLatest => latestPos
+        case StreamPositionHorizon =>
+          InitialPositionInStreamExtended.newInitialPosition(
+            InitialPositionInStream.TRIM_HORIZON)
+        case StreamPositionTimestamp =>
+          InitialPositionInStreamExtended.newInitialPositionAtTimestamp(
+            DateFormat.getInstance().parse(config.getString("position.time")))
+      }
+      .getOrElse(latestPos)
+
+    val completionTimeout = getDurationOpt("checkpoint.completion-timeout")
+      .map(d => Timeout(d))
+      .getOrElse(Timeout(20.seconds))
+    val maxBufferSize =
+      getIntOpt("checkpoint.max-buffer-size").getOrElse(100000)
+    val maxDurationInSeconds = getDurationOpt("checkpoint.max-duration")
+      .map(d => d.toSeconds.toInt)
+      .getOrElse(60)
+    val checkpointConfig =
+      CheckpointConfig(completionTimeout, maxBufferSize, maxDurationInSeconds)
+
+    val kinesisClient =
+      if (kinesisAsyncClient == null) KinesisAsyncClient.builder.build()
+      else kinesisAsyncClient
+    val dynamoClient =
+      if (dynamoDbAsyncClient == null) DynamoDbAsyncClient.builder.build()
+      else dynamoDbAsyncClient
+    val cloudWatchClient =
+      if (cloudWatchAsyncClient == null) CloudWatchAsyncClient.builder.build()
+      else cloudWatchAsyncClient
+
+    ConsumerConfig(streamName,
+                   name,
+                   generateWorkerId(),
+                   checkpointConfig,
                    kinesisClient,
                    dynamoClient,
-                   cloudWatchClient)
+                   cloudWatchClient,
+                   streamPosition)
   }
 
   private def generateWorkerId(): String = UUID.randomUUID().toString
