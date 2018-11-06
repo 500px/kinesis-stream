@@ -27,6 +27,16 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object Consumer {
 
+  /**
+    * Returns a Source which emits checkpointable Records from the Kinesis stream.
+    * The stream will contain messages from all shard assignments for the KCL worker
+    * A KCL worker is started upon stream materialization and shut down upon stream completin/termination
+    * @param config
+    * @param am
+    * @param system
+    * @param ec
+    * @return
+    */
   def source(config: ConsumerConfig)(
       implicit am: ActorMaterializer,
       system: ActorSystem,
