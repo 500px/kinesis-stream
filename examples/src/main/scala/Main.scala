@@ -15,8 +15,6 @@ object Main extends App {
   val consumer = Sink.foreach[String](s => logging.info(s))
   val ignore = Sink.ignore
 
-  // Attach a MergeHub Source to the consumer. This will materialize to a
-  // corresponding Sink.
   val runnableGraph =
     Consumer
       .source(ConsumerConfig.fromConfig(system.settings.config.getConfig("consumer")))

@@ -1,0 +1,30 @@
+language: scala
+scala:
+- 2.12.7
+
+cache:
+  directories:
+  - "$HOME/.local"
+  - "$HOME/.ivy2/cache"
+  - "$HOME/.sbt/boot/"
+before_cache:
+- find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
+- find $HOME/.sbt        -name "*.lock"               -print -delete
+before_install:
+  - openssl aes-256-cbc -K $encrypted_04c98034e207_key -iv $encrypted_04c98034e207_iv -in gpg/secring.asc.enc -out gpg/secring.asc -d
+env:
+  global:
+  # SONATYPE_USERNAME
+  - secure: AuSWZvscCJcQj/ue3p1QvmAKETN2e55krkJyqFTxd4ha2feywEqJy3PMsvVX5RK2bHp7ms0JHlmrQSr3PrJg178s6ELZ21suYrWTAeoyleS6Jl2AuuoTLc/OzXXhvF4Jodx1Zt5zC0tCg49PR3oeXLVMwW9RyFQnoTNiHEIHCz1PjbPXt3j4k4FxrV35sTZC/Go9WwPf46jCB6l1v/ZDg2gTbpdXYdorhbtSezRsmm8rbrB+Oev4p0wk67Gnclim8uQXmrWCCvwMKtshm1J2C1bvvk5Zsno+1+Ut0q7mNrThXF0C4CCXFCxouL9ynP1YskF38ZNS527ih20UJ1skNux8X4IIjPoDTBOdL3KAU7JTeEVXU5dQRS8X3FCyutzeFMd31PGjOxIcs1MZPHL/6m/4Wdll0CD8jJiCvTPsnN3+5YCo/3Nc888FgYjIkY+Am9pMN1W49okvRfUuNp1w6WJIwkGcUmWajLpKkihzWvFJfpFTNIhqVjt+1x0TeFK8ZbazuBezqGIB5AGaTS5Vgi3m0os3Oe9LPje2WCrHuJXRz1SX9Q4NBWlpW/fDZAiL6otPAX/AgNCRlw6HoQ+Q8tIwDempea49SEvYmuDtwukJR2JeA4bWfHlgfvvjwIY2ehVi+JaGsDC8vbaXSxFTyQoSXY8Kkv0S0/sYNwUeMxM=
+  # SONATYPE_PASSWORD
+  - secure: O3pXgi7mIBap7af0+ptYzaMP0FBNW5jnNJTnUhZE09FPQn/4B6HIt+iuzA902Sx4Hx5UVG4pmKybR0U6XxHLPPP9xRUKnxpsY850C749L3XLSBkpFk0sPRc+Ehmhp2EmTwc+rgKSVp0b/9+kU/pr16KKcEwDRlUvItoKkWZpb3p3as49ECypk0NvBeUbMra7GykwrUOj2UyyHh8wFXRkb1/qCXh5m9bUtgFP0Gr8Ls4qVDspN+F2iNaXfvRgMzlEfuNgRl7ueJ3MSOsuUagJEf7J1erPvkyFLpCgT7KAfSvF3URBMgk0TzOaiY5hCOQm+CmoD4qGlsuRgHqs1vtQxdp9iWbIdU7eH5vpmutRmFMziULRRNkRFsDJFFYUjYBAQlWgd/ZdmPfwKA0JuYLNv7EXXr7P+GHuLtjEaXgzBBb/682r5otUC/CzwI6ZWeLQrXgowmSGqDYpddkRfgyCgZszLGhHUbw+Bu6uEbmWdzzhnssgnf6ntw3zivTzpZTxxcm5PSFKYKkfie5kjY1c3ixqHyJxLc0COXDJBbvwpUTUcmYiD1eql/gVmAc6IrgkF8tHivcJQb3M6wd0lLjWfuUBlMsVUsgGqMv6Iwmvl6ZfOvybuKlw8ScnRMgNellSZPVnaBWhpLHVE9SMsTlMOR9ZrLkuoemslthQZaB2NG4=
+  - GPG_KEYPAIR_FOLDER=gpg
+  # GPG_PASS_PHRASE
+  - secure: k/IsqchhKsY9eeMwXilUpJ9qGBF+W696JjQJl6JqddkglbkzTfsOGWPM0fqcErqDNX3RLV+p8W9fU9Oi4EJnE2kOU6g1r9Qk+nqnjC2ecOhSajEfY9R0oozCGwVFNfM7UFnGI5tn80X7DOzf+oFHLbWuH8/np0VfXhF0LtyDXVbBzezAv8lmGaQBlUKHq+iDk7Z+Z6QGWoquAKNT+/MU3mKXF9XD5ustCmo8hm4YbJv6in3uKwvDCXkgNYMAWU735cVSV5hpX7ykwXTPM9RgQ1k3hYcDPNYx24OmUze27hP/cFr4WjZt3bYZmC8Sij0emmIJOXeOo6VsOwz8MA3fcyFtvhT8IrbkzBBXdRGdPl1nEhQZrPUI2sJWe5dKEPYLMGPl6VnF2Y9BsJ6J1p2RWxqKvSnKZT9HZ1YHY8dc7VnHcNrbVAq7R3FAT6a+Qrg/Qvjl26IagMITlCLNxPXG6PyQTd9amBUSKPnwbwuOw1ZshDTtz4E4P8vDUHs45P/iiIfQ0tNRZjGDhkQ4JkFmKml+oSIYT8pn0xbf75lOhTzEJbbv4LzHfsLmnJp1t86OzbA4LROEkoZ8UxxfhQQjRHsrIhaWbgkCFgWYEAgQJaHCV2bIkam/yHsTQ6GJbovUrGL8sFaaAZhT5xWFTvOiJIAypQ6DRMw4IiVcDHNn7jk=
+
+deploy:
+  provider: script
+  skip_cleanup: true
+  script: "./release.sh $TRAVIS_TAG;"
+  on:
+    tags: true

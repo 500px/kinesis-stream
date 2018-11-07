@@ -51,8 +51,8 @@ class ShardCheckpointTrackerActor(shardId: String,
         if (shouldCheckpoint() || force) {
           log.debug("Checkpointing(forced={}) {}", force, shardId)
           // we absorb the exceptions so we don't lose state for this actor
-          Try(
-            checkpointer.checkpoint(s.sequenceNumber(), s.subSequenceNumber()))
+          Try(checkpointer.checkpoint(s.sequenceNumber(),
+                                      s.subSequenceNumber())).toEither
             .fold(
               ex => sender() ! Failure(ex),
               _ => {

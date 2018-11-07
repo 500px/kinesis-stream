@@ -1,19 +1,19 @@
 import sbt.Keys.{parallelExecution, scalacOptions}
 
+val scala11 = "2.11.12"
+val scala12 = "2.12.7"
+
 val scalaSettings = Seq(
-  scalaVersion := "2.12.7",
+  scalaVersion := scala12,
   scalacOptions ++= Seq(
+    "-target:jvm-1.8",
     "-deprecation", // Emit warning and location for usages of deprecated APIs.
     "-feature", // Emit warning and location for usages of features that should be imported explicitly.
-    "-Ywarn-dead-code", // Warn when dead code is identified.
-    "-Ywarn-unused:implicits", // Warn if an implicit parameter is unused.
-    "-Ywarn-unused:imports", // Warn if an import selector is not referenced.
-    "-Ywarn-unused:locals", // Warn if a local definition is unused.
-    "-Ywarn-unused:params", // Warn if a value parameter is unused.
-    "-Ywarn-unused:patvars", // Warn if a variable bound in a pattern is unused.
-    "-Ywarn-unused:privates" // Warn if a private member is unused.
-  )
+    "-Ywarn-dead-code" // Warn when dead code is identified.
+  ),
+  crossScalaVersions := List(scala12, scala11)
 )
+
 val akkaStreamV = "2.5.14"
 
 val dependencySettings = Seq(
@@ -30,16 +30,56 @@ val dependencySettings = Seq(
   )
 )
 
+val sonatypeSettings = Seq(
+  homepage := Some(url("https://github.com/500px/kinesis-stream")),
+  scmInfo := Some(
+    ScmInfo(url("https://github.com/500px/kinesis-stream"),
+            "git@github.com:500px/kinesis-stream.git")),
+  developers := List(
+    Developer("platform",
+              "Platform Team",
+              "platform@500px.com",
+              url("https://github.com/500px"))),
+  licenses += ("MIT", url("https://opensource.org/licenses/MIT")),
+  publishMavenStyle := true,
+  credentials ++= sys.env
+    .get("SONATYPE_USERNAME")
+    .zip(sys.env.get("SONATYPE_PASSWORD"))
+    .headOption
+    .map {
+      case (username, password) =>
+        Seq(
+          Credentials("Sonatype Nexus Repository Manager",
+                      "oss.sonatype.org",
+                      username,
+                      password))
+    }
+    .getOrElse(Seq.empty[Credentials])
+)
+
+def getUserKeyRingPath(name: String): Option[File] =
+  sys.env.get("GPG_KEYPAIR_FOLDER").map(folder => Path(folder) / name)
+def defaultKeyRing(name: String): File = Path.userHome / ".sbt" / "gpg" / name
+
 val publishSettings = Seq(
-  publishTo := {
-    Some(
-      "packagecloud+https" at "packagecloud+https://packagecloud.io/500px/platform")
-  }
+  pgpPublicRing := getUserKeyRingPath("pubring.asc")
+    .getOrElse(defaultKeyRing("pubring.asc")),
+  pgpSecretRing := getUserKeyRingPath("secring.asc")
+    .getOrElse(defaultKeyRing("secring.asc")),
+  usePgpKeyHex("1E0CE91DF4E8CDEF9D0C9C1EDDD2DB9AA86CE295"),
+  pgpPassphrase := sys.env.get("GPG_PASS_PHRASE").map(key => key.toCharArray),
+  publishTo := Some(
+    if (isSnapshot.value)
+      Opts.resolver.sonatypeSnapshots
+    else
+      Opts.resolver.sonatypeStaging
+  )
 )
 
 lazy val root = (project in file("."))
   .settings(scalaSettings)
-  .settings(name := "kinesis-stream", organization := "px")
+  .settings(name := "kinesis-stream", organization := "com.500px")
+  .settings(sonatypeSettings)
   .settings(publishSettings)
   .settings(dependencySettings)
   .settings(
