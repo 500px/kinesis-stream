@@ -1,7 +1,7 @@
 import sbt.Keys.{parallelExecution, scalacOptions}
 
 val scalaSettings = Seq(
-  scalaVersion := "2.12.6",
+  scalaVersion := "2.12.7",
   scalacOptions ++= Seq(
     "-deprecation", // Emit warning and location for usages of deprecated APIs.
     "-feature", // Emit warning and location for usages of features that should be imported explicitly.
