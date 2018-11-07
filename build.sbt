@@ -48,7 +48,7 @@ val publishSettings = Seq(
 
 lazy val root = (project in file("."))
   .settings(scalaSettings)
-  .settings(name := "kinesis-stream")
+  .settings(name := "kinesis-stream", organization := "px")
   .settings(publishSettings)
   .settings(overridePublishSettings)
   .settings(dependencySettings)
