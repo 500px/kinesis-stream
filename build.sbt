@@ -31,9 +31,17 @@ val dependencySettings = Seq(
   )
 )
 
+val publishSettings = Seq(
+  publishTo := {
+    Some(
+      "packagecloud+https" at "packagecloud+https://packagecloud.io/500px/platform")
+  }
+)
+
 lazy val root = (project in file("."))
   .settings(scalaSettings)
-  .settings(name := "kinesis-source")
+  .settings(name := "kinesis-stream", organization := "px")
+  .settings(publishSettings)
   .settings(dependencySettings)
   .settings(
     parallelExecution in Test := false,
