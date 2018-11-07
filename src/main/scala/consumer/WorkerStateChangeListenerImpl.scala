@@ -1,3 +1,5 @@
+package consumer
+
 import akka.Done
 import akka.event.LoggingAdapter
 import software.amazon.kinesis.coordinator.WorkerStateChangeListener
