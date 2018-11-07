@@ -36,19 +36,20 @@ class ShardCheckpointTrackerActor(shardId: String,
       log.debug("Tracking: {}", sequenceNumbers.map(formatSeqNum).mkString(","))
       tracked ++= sequenceNumbers
       sender() ! Ack
-    case Process(sequenceNumber: ExtendedSequenceNumber)
-        if tracked.contains(sequenceNumber) =>
+    case Process(sequenceNumber: ExtendedSequenceNumber) =>
       log.debug("Marked: {}", formatSeqNum(sequenceNumber))
-      processed += sequenceNumber
+      if (tracked.contains(sequenceNumber)) {
+        processed += sequenceNumber
+      }
       sender() ! Ack
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>
-      val checkpointable = tracked.takeWhile(processed.contains)
+      val checkpointable = getCheckpointable()
       log.debug("CheckpointIfNeeded: {}",
                 checkpointable
                   .map(formatSeqNum)
                   .mkString("[", ",", "]"))
-      checkpointable.lastOption.fold(sender() ! Ack) { s =>
+      checkpointable.lastOption.fold(sender() ! Checkpointed()) { s =>
         if (shouldCheckpoint() || force) {
           log.debug("Checkpointing(forced={}) {}", force, shardId)
           // we absorb the exceptions so we don't lose state for this actor
@@ -60,12 +61,12 @@ class ShardCheckpointTrackerActor(shardId: String,
                 log.info("{} is at {}", shardId, formatSeqNum(s))
                 tracked --= checkpointable
                 processed --= checkpointable
-                sender() ! Ack
+                sender() ! Checkpointed(Some(s))
               }
             )
         } else {
           log.info("Skipping Checkpoint")
-          sender() ! Ack
+          sender() ! Checkpointed()
         }
       }
       notifyIfCompleted()
@@ -75,12 +76,16 @@ class ShardCheckpointTrackerActor(shardId: String,
       notifyIfCompleted()
 
     case Get =>
-      log.info("Tracked: {}", tracked.mkString(","))
-      log.info("Processed: {}", processed.mkString(","))
+      log.debug("Tracked: {}", tracked.mkString(","))
+      log.debug("Processed: {}", processed.mkString(","))
+      sender() ! Details(tracked, getCheckpointable())
     case Shutdown =>
       notifyWatchersOfShutdown()
       context.stop(self)
   }
+
+  def getCheckpointable(): SortedSet[ExtendedSequenceNumber] =
+    tracked.takeWhile(processed.contains)
 
   override def postStop(): Unit = {
     log.info("Shutting down tracker {}", shardId)
@@ -129,6 +134,10 @@ object ShardCheckpointTrackerActor {
   case class Process(sequenceNumber: ExtendedSequenceNumber)
   case class CheckpointIfNeeded(checkpointer: RecordProcessorCheckpointer,
                                 force: Boolean = false)
+
+  case class Details(tracked: SortedSet[ExtendedSequenceNumber],
+                     checkpointable: SortedSet[ExtendedSequenceNumber])
+  case class Checkpointed(sequenceNumber: Option[ExtendedSequenceNumber] = None)
   case object WatchCompletion
   case object Completed
   case object Get
