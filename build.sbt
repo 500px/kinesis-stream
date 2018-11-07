@@ -1,3 +1,4 @@
+import aether.AetherKeys.aetherWagons
 import sbt.Keys.{parallelExecution, scalacOptions}
 
 val scalaSettings = Seq(
@@ -31,9 +32,25 @@ val dependencySettings = Seq(
   )
 )
 
+val publishSettings = Seq(
+  credentials ++= sys.env
+    .get("PACKAGE_CLOUD_PUBLISH_KEY")
+    .map(key => Seq(Credentials("packagecloud", "packagecloud.io", "", key)))
+    .getOrElse(Seq(Credentials(Path.userHome / ".ivy2" / ".credentials"))),
+  aetherWagons := Seq(
+    aether.WagonWrapper("packagecloud+https",
+                        "io.packagecloud.maven.wagon.PackagecloudWagon")),
+  publishTo := {
+    Some(
+      "packagecloud+https" at "packagecloud+https://packagecloud.io/500px/platform")
+  }
+)
+
 lazy val root = (project in file("."))
   .settings(scalaSettings)
-  .settings(name := "kinesis-source")
+  .settings(name := "kinesis-stream")
+  .settings(publishSettings)
+  .settings(overridePublishSettings)
   .settings(dependencySettings)
   .settings(
     parallelExecution in Test := false,

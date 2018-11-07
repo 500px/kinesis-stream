@@ -1,0 +1,23 @@
+language: scala
+scala:
+- 2.12.7
+
+cache:
+  directories:
+  - "$HOME/.local"
+  - "$HOME/.ivy2/cache"
+  - "$HOME/.sbt/boot/"
+before_cache:
+- find $HOME/.ivy2/cache -name "ivydata-*.properties" -print -delete
+- find $HOME/.sbt        -name "*.lock"               -print -delete
+env:
+  global:
+  # PACKAGE_CLOUD_PUBLISH_KEY=1553d37fa6bea228158280fcfc7bc76eef5d7ff8ea00cb04
+  - secure: JVYIRl7UNFAr/YFikFpGi8Wlq9dFUoj5A7tVoe+qVl5i9BVAP8hW/XiVn2WLWM6SZ3eIB2H0V9eXb2W9oUsDLZN+mcHqdD96qQo8k/DeML/ypqzAM0b8nK3CaiUET95riuao8Ny0WpnDZxRq/faJyrJNtR1PZp7tae1Gx+szHElnRo0T/FGASqi5jAfJgYH20hliObb5E1iD5mfwBsfdJeRDy0vCs6KMi0bhT9+kHXmb/lnz0KZRLXjxBBuIpXmgqjdXuj3zuaJEW2eWLRUPRd+4Ee4PpSOsnAA4DD74lx508QjOhHo+fIRTCpbpcm6gEMonCx0WcnmaDe2/oiLXPO9ItaV8USLdCRzijqgB3Czm17ITK6hDkE33qLhG6UF9fUvvUNIO3dSSI8pg5Gm3Uy3jv9PoFmNFqi7UCH5N+36yOp8jz1cmebNvLnQephegtKsg/6sm3XTnIK4Uc3VRFIT4G2uhztJ/NMQTvHeW4effeq2rjA++KnDomtB0F8xsS/oPxHVLxjhkjIrF7FhAVEpy4YMEAF73TE9jMZsHROcw6+rCSOsy5+YY3ji75TkcF+Ly4BvBQcg/JP3DeId7D2NkAgbajqb/JOOOcY3wa4q0FfU+wtTxw2YfjCHfK8mgYXv2WHNOF1otsrJ8DAOS9xO/iU1/hB65bPXW/orcAFQ=
+
+deploy:
+  provider: script
+  skip_cleanup: true
+  script: "./release.sh $TRAVIS_TAG;"
+  on:
+    tags: true
