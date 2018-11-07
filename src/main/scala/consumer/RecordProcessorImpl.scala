@@ -93,7 +93,10 @@ class RecordProcessorImpl(
       shutdownRequestedInput: ShutdownRequestedInput): Unit = {
     logging.debug("Shutdown Requested: {}", shardId)
     checkpointForShutdown(shutdownRequestedInput.checkpointer())
-
+    // since we are shutting down this processor, lets complete the queue associated with it since this processor will
+    // not emit any further records
+    // the materialized stream associated with this shard will complete, freeing up resources
+    queue.complete()
   }
 
   def checkpointIfNeeded(checkpointer: RecordProcessorCheckpointer): Unit =
