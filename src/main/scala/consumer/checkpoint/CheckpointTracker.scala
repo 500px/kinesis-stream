@@ -1,7 +1,5 @@
 package consumer.checkpoint
 
-import java.util.concurrent.TimeUnit
-
 import akka.Done
 import akka.actor.{Actor, ActorSystem}
 import akka.pattern.{AskTimeoutException, ask}
@@ -11,23 +9,21 @@ import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.Iterable
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Future}
 
-class CheckpointTracker(workerId: String,
-                        maxBufferSize: Int,
-                        maxDurationInSeconds: Int,
-                        completionTimeout: Timeout)(
-    implicit system: ActorSystem,
-    ec: ExecutionContext) {
+class CheckpointTracker(
+    workerId: String,
+    maxBufferSize: Int,
+    maxDurationInSeconds: Int,
+    completionTimeout: Timeout,
+    timeout: Timeout)(implicit system: ActorSystem, ec: ExecutionContext) {
 
   @volatile var isShutdown = false
 
   val tracker = system.actorOf(
     CheckpointTrackerActor.props(workerId, maxBufferSize, maxDurationInSeconds),
     s"tracker-${workerId.take(5)}")
-
-  val timeout = Timeout(5, TimeUnit.SECONDS)
 
   /**
     * Track a set of sequence numbers
@@ -139,24 +135,28 @@ case class CheckpointTimeoutException(message: String)
     extends Exception(message)
 
 object CheckpointTracker {
-  def apply(workerId: String,
-            maxBufferSize: Int,
-            maxDurationInSeconds: Int,
-            completionTimeout: Timeout)(implicit system: ActorSystem,
-                                        ec: ExecutionContext) =
+  def apply(
+      workerId: String,
+      maxBufferSize: Int,
+      maxDurationInSeconds: Int,
+      completionTimeout: Timeout,
+      timeout: Timeout)(implicit system: ActorSystem, ec: ExecutionContext) =
     new CheckpointTracker(workerId,
                           maxBufferSize,
                           maxDurationInSeconds,
-                          completionTimeout)
+                          completionTimeout,
+                          timeout)
   def apply(workerId: String, config: CheckpointConfig)(
       implicit system: ActorSystem,
       ec: ExecutionContext) =
     new CheckpointTracker(workerId,
                           config.maxBufferSize,
                           config.maxDurationInSeconds,
-                          config.completionTimeout)
+                          config.completionTimeout,
+                          config.timeout)
 }
 
-case class CheckpointConfig(completionTimeout: Timeout = Timeout(20.seconds),
+case class CheckpointConfig(completionTimeout: Timeout = Timeout(30.seconds),
                             maxBufferSize: Int = 100000,
-                            maxDurationInSeconds: Int = 60)
+                            maxDurationInSeconds: Int = 60,
+                            timeout: Timeout = Timeout(20.seconds))

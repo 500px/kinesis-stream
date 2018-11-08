@@ -58,20 +58,22 @@ class ShardCheckpointTrackerActor(shardId: String,
             .fold(
               ex => sender() ! Failure(ex),
               _ => {
-                log.info("{} is at {}", shardId, formatSeqNum(s))
+                log.info("Checkpointed Successfully: {} is at {}",
+                         shardId,
+                         formatSeqNum(s))
                 tracked --= checkpointable
                 processed --= checkpointable
                 sender() ! Checkpointed(Some(s))
               }
             )
         } else {
-          log.info("Skipping Checkpoint")
+          log.info("Skipping Checkpoint: {}", shardId)
           sender() ! Checkpointed()
         }
       }
       notifyIfCompleted()
     case WatchCompletion =>
-      log.info("WatchCompletion")
+      log.info("WatchCompletion: {}", shardId)
       watchers = sender() :: watchers
       notifyIfCompleted()
 

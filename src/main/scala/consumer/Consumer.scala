@@ -160,6 +160,9 @@ object ConsumerConfig {
 
     val completionTimeout = getDurationOpt("checkpoint.completion-timeout")
       .map(d => Timeout(d))
+      .getOrElse(Timeout(30.seconds))
+    val timeout = getDurationOpt("checkpoint.timeout")
+      .map(d => Timeout(d))
       .getOrElse(Timeout(20.seconds))
     val maxBufferSize =
       getIntOpt("checkpoint.max-buffer-size").getOrElse(100000)
@@ -167,7 +170,10 @@ object ConsumerConfig {
       .map(d => d.toSeconds.toInt)
       .getOrElse(60)
     val checkpointConfig =
-      CheckpointConfig(completionTimeout, maxBufferSize, maxDurationInSeconds)
+      CheckpointConfig(completionTimeout,
+                       maxBufferSize,
+                       maxDurationInSeconds,
+                       timeout)
 
     val kinesisClient =
       if (kinesisAsyncClient == null) KinesisAsyncClient.builder.build()
