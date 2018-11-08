@@ -27,6 +27,7 @@ class ShardCheckpointTrackerActor(shardId: String,
   override def receive: Receive = {
     case Track(sequenceNumbers) =>
       log.debug("Tracking: {}", sequenceNumbers.map(formatSeqNum).mkString(","))
+      log.debug("Total Tracked: {}", tracked.size)
       tracked ++= sequenceNumbers
       sender() ! Ack
     case Process(sequenceNumber: ExtendedSequenceNumber) =>
