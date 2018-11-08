@@ -1,10 +1,10 @@
-package consumer
+package px.kinesis.stream.consumer
 
 import java.time.Instant
 
 import akka.Done
 import akka.util.ByteString
-import consumer.checkpoint.CheckpointTracker
+import px.kinesis.stream.consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 

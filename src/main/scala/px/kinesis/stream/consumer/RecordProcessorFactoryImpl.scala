@@ -1,10 +1,10 @@
-package consumer
+package px.kinesis.stream.consumer
 
 import akka.NotUsed
 import akka.event.LoggingAdapter
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{ActorMaterializer, KillSwitch, OverflowStrategy}
-import consumer.checkpoint.CheckpointTracker
+import px.kinesis.stream.consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.processor.{
   ShardRecordProcessor,
   ShardRecordProcessorFactory

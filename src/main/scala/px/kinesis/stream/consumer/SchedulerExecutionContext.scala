@@ -1,4 +1,4 @@
-package consumer
+package px.kinesis.stream.consumer
 
 import java.util.concurrent.Executors
 

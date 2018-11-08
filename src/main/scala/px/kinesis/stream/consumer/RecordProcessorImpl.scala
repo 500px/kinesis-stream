@@ -1,10 +1,10 @@
-package consumer
+package px.kinesis.stream.consumer
 
 import akka.Done
 import akka.event.LoggingAdapter
 import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{KillSwitch, QueueOfferResult}
-import consumer.checkpoint.CheckpointTracker
+import px.kinesis.stream.consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
 import software.amazon.kinesis.processor.{
   RecordProcessorCheckpointer,

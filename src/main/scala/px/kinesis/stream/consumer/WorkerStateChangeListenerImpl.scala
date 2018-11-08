@@ -1,4 +1,4 @@
-package consumer
+package px.kinesis.stream.consumer
 
 import akka.Done
 import akka.event.LoggingAdapter
