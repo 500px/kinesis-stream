@@ -21,7 +21,7 @@ class ShardCheckpointTrackerActor(shardId: String,
 
   var tracked = SortedSet.empty[ExtendedSequenceNumber]
   var processed = SortedSet.empty[ExtendedSequenceNumber]
-  var timeSinceLastCheckpoint = Instant.now().getEpochSecond
+  var timeSinceLastCheckpoint = now()
   var watchers: List[ActorRef] = List.empty[ActorRef]
 
   override def receive: Receive = {
@@ -57,6 +57,7 @@ class ShardCheckpointTrackerActor(shardId: String,
                          formatSeqNum(s))
                 tracked --= checkpointable
                 processed --= checkpointable
+                timeSinceLastCheckpoint = now()
                 sender() ! Checkpointed(Some(s))
               }
             )
@@ -120,6 +121,7 @@ class ShardCheckpointTrackerActor(shardId: String,
     tracked.isEmpty || tracked.forall(processed.contains)
   }
 
+  def now(): Long = Instant.now().getEpochSecond
   def formatSeqNum(es: ExtendedSequenceNumber): String =
     es.sequenceNumber().takeRight(10)
 }
