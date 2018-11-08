@@ -32,9 +32,15 @@ class ShardCheckpointTrackerActor(shardId: String,
       sender() ! Ack
     case Process(sequenceNumber: ExtendedSequenceNumber) =>
       log.debug("Marked: {}", formatSeqNum(sequenceNumber))
+      val start = System.currentTimeMillis()
       if (tracked.contains(sequenceNumber)) {
         processed += sequenceNumber
       }
+      val end = System.currentTimeMillis()
+      log.debug("Process in actor: {} ms, tracked size: {}, processed size: {}",
+                end - start,
+                tracked.size,
+                processed.size)
       sender() ! Ack
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>
