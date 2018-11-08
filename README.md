@@ -25,4 +25,11 @@ kinesis:ListStreams
 kinesis:SubscribeToShard
 kinesis:DescribeStreamConsumer
 
+// For lease management
+// Resource:  Dynamo table with same name as kinesis app name
+dynamodb:*
+
+// Metrics
+// Resource: *
+cloudwatch:PutMetricData
 ```
