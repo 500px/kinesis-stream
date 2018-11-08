@@ -1,8 +1,8 @@
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.Sink
-import consumer.Consumer
+import akka.stream.scaladsl.{Keep, Sink}
+import px.kinesis.stream.consumer.Consumer
 
 object Main extends App {
 
@@ -26,7 +26,7 @@ object Main extends App {
       .mapAsyncUnordered(1)(r => r.markProcessed().map(_ => r))
       .map(r =>
         s"${r.sequenceNumber.takeRight(10)} /${r.shardId} - ${r.data.utf8String}")
-      .to(consumer)
+      .toMat(consumer)(Keep.left)
 
   val done = runnableGraph.run()
   done.onComplete(_ => {

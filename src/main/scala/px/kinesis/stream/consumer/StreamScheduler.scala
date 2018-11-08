@@ -1,11 +1,11 @@
-package consumer
+package px.kinesis.stream.consumer
 
 import akka.actor.ActorSystem
 import akka.event.Logging
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, KillSwitch}
 import akka.{Done, NotUsed}
-import consumer.checkpoint.CheckpointTracker
+import px.kinesis.stream.consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.common.ConfigsBuilder
 import software.amazon.kinesis.coordinator.Scheduler
 import software.amazon.kinesis.lifecycle.events.TaskExecutionListenerInput

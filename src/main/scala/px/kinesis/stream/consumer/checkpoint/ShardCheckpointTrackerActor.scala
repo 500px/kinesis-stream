@@ -1,17 +1,10 @@
-package consumer.checkpoint
+package px.kinesis.stream.consumer.checkpoint
 
 import java.time.Instant
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import consumer.checkpoint.ShardCheckpointTrackerActor.{
-  CheckpointIfNeeded,
-  Get,
-  Process,
-  Track,
-  WatchCompletion,
-  _
-}
+import ShardCheckpointTrackerActor._
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 

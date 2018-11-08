@@ -1,16 +1,17 @@
-package consumer.checkpoint
+package px.kinesis.stream.consumer.checkpoint
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import consumer.checkpoint.CheckpointTrackerActor._
-import akka.pattern.gracefulStop
-import akka.pattern.pipe
+import akka.pattern.{gracefulStop, pipe}
+import CheckpointTrackerActor._
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
-import consumer.checkpoint.{ShardCheckpointTrackerActor => shard}
 
-import scala.concurrent.duration._
 import scala.collection.immutable.Iterable
 import scala.concurrent.Future
+import scala.concurrent.duration._
+import px.kinesis.stream.consumer.checkpoint.{
+  ShardCheckpointTrackerActor => shard
+}
 
 class CheckpointTrackerActor(workerId: String,
                              maxBufferSize: Int,

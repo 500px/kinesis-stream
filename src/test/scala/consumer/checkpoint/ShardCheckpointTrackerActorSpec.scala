@@ -3,9 +3,10 @@ package consumer.checkpoint
 import akka.actor.Status.Failure
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import consumer.checkpoint.ShardCheckpointTrackerActor._
+import px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 

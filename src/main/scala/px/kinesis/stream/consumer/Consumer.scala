@@ -1,4 +1,4 @@
-package consumer
+package px.kinesis.stream.consumer
 
 import java.text.DateFormat
 import java.util.{Date, UUID}
@@ -9,7 +9,7 @@ import akka.stream.scaladsl.{Keep, MergeHub, Source}
 import akka.stream.{ActorMaterializer, KillSwitches}
 import akka.util.Timeout
 import com.typesafe.config.Config
-import consumer.checkpoint.CheckpointConfig
+import px.kinesis.stream.consumer.checkpoint.CheckpointConfig
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
