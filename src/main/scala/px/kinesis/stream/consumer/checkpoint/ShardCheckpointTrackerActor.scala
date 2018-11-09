@@ -4,11 +4,11 @@ import java.time.Instant
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
-import ShardCheckpointTrackerActor._
+import px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor._
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
-import scala.collection.immutable.{Iterable, SortedSet}
+import scala.collection.immutable.{Iterable, Queue}
 import scala.util.Try
 
 class ShardCheckpointTrackerActor(shardId: String,
@@ -19,28 +19,37 @@ class ShardCheckpointTrackerActor(shardId: String,
   implicit val ordering =
     Ordering.fromLessThan[ExtendedSequenceNumber]((a, b) => a.compareTo(b) < 0)
 
-  var tracked = SortedSet.empty[ExtendedSequenceNumber]
-  var processed = SortedSet.empty[ExtendedSequenceNumber]
+  var tracked = Queue.empty[ExtendedSequenceNumber]
+  var processed = Set.empty[ExtendedSequenceNumber]
+  var lastCheckpoint: Option[ExtendedSequenceNumber] = None
   var timeSinceLastCheckpoint = now()
   var watchers: List[ActorRef] = List.empty[ActorRef]
+
+  log.info("{} Tracker started using {}", shardId, context.dispatcher.toString)
 
   override def receive: Receive = {
     case Track(sequenceNumbers) =>
       log.debug("Tracking: {}", sequenceNumbers.map(formatSeqNum).mkString(","))
       log.debug("Total Tracked: {}", tracked.size)
+      val start = System.currentTimeMillis()
       tracked ++= sequenceNumbers
+      val end = System.currentTimeMillis()
+      log.info("Track in actor: {} ms, tracked size: {}, processed size: {}",
+               end - start,
+               tracked.size,
+               processed.size)
       sender() ! Ack
     case Process(sequenceNumber: ExtendedSequenceNumber) =>
       log.debug("Marked: {}", formatSeqNum(sequenceNumber))
       val start = System.currentTimeMillis()
-      if (tracked.contains(sequenceNumber)) {
+      if (lastCheckpoint.forall(c => ordering.gt(sequenceNumber, c))) {
         processed += sequenceNumber
       }
       val end = System.currentTimeMillis()
       log.debug("Process in actor: {} ms, tracked size: {}, processed size: {}",
-                end - start,
-                tracked.size,
-                processed.size)
+               end - start,
+               tracked.size,
+               processed.size)
       sender() ! Ack
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>
@@ -61,14 +70,15 @@ class ShardCheckpointTrackerActor(shardId: String,
                 log.info("Checkpointed Successfully: {} is at {}",
                          shardId,
                          formatSeqNum(s))
-                tracked --= checkpointable
+                tracked = tracked.drop(checkpointable.size)
                 processed --= checkpointable
+                lastCheckpoint = Some(s)
                 timeSinceLastCheckpoint = now()
                 sender() ! Checkpointed(Some(s))
               }
             )
         } else {
-          log.info("Skipping Checkpoint: {}", shardId)
+          log.debug("Skipping Checkpoint: {}", shardId)
           sender() ! Checkpointed()
         }
       }
@@ -87,7 +97,7 @@ class ShardCheckpointTrackerActor(shardId: String,
       context.stop(self)
   }
 
-  def getCheckpointable(): SortedSet[ExtendedSequenceNumber] =
+  def getCheckpointable(): Queue[ExtendedSequenceNumber] =
     tracked.takeWhile(processed.contains)
 
   override def postStop(): Unit = {
@@ -139,8 +149,8 @@ object ShardCheckpointTrackerActor {
   case class CheckpointIfNeeded(checkpointer: RecordProcessorCheckpointer,
                                 force: Boolean = false)
 
-  case class Details(tracked: SortedSet[ExtendedSequenceNumber],
-                     checkpointable: SortedSet[ExtendedSequenceNumber])
+  case class Details(tracked: Queue[ExtendedSequenceNumber],
+                     checkpointable: Queue[ExtendedSequenceNumber])
   case class Checkpointed(sequenceNumber: Option[ExtendedSequenceNumber] = None)
   case object WatchCompletion
   case object Completed

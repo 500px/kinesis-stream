@@ -24,6 +24,7 @@ class RecordProcessorImpl(
     workerId: String)(implicit ec: ExecutionContext, logging: LoggingAdapter)
     extends ShardRecordProcessor {
 
+  val EnqueueBatchSize = 100
   var shardId: String = _
 
   override def initialize(initializationInput: InitializationInput): Unit = {
@@ -38,7 +39,11 @@ class RecordProcessorImpl(
     val records = transformRecords(processRecordsInput.records())
     trackRecords(records)
     checkpointIfNeeded(processRecordsInput.checkpointer())
-    enqueueRecords(records)
+
+    records.grouped(EnqueueBatchSize).foreach { r =>
+      enqueueRecords(r)
+      checkpointIfNeeded(processRecordsInput.checkpointer())
+    }
   }
 
   def transformRecords(

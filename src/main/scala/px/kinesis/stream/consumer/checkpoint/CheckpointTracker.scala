@@ -24,7 +24,8 @@ class CheckpointTracker(
   var logging: LoggingAdapter = Logging(system, this.getClass)
 
   val tracker = system.actorOf(
-    CheckpointTrackerActor.props(workerId, maxBufferSize, maxDurationInSeconds),
+    CheckpointTrackerActor
+      .props(workerId, maxBufferSize, maxDurationInSeconds),
     s"tracker-${workerId.take(5)}")
 
   /**
@@ -36,7 +37,7 @@ class CheckpointTracker(
     * @return
     */
   def track(shardId: String, sequences: Iterable[ExtendedSequenceNumber]) =
-    timeFuture("track") {
+    timeFuture(s"track - $shardId") {
       tracker
         .ask(Track(shardId, sequences))(timeout)
         .map(_ => Done)
@@ -53,7 +54,7 @@ class CheckpointTracker(
     * @return
     */
   def process(shardId: String, sequence: ExtendedSequenceNumber) =
-    timeFuture("process") {
+    timeFuture(s"process - $shardId") {
       tracker
         .ask(Process(shardId, sequence))(timeout)
         .map(_ => Done)
@@ -129,7 +130,7 @@ class CheckpointTracker(
     val start = System.currentTimeMillis()
     fut.onComplete {
       case _ =>
-        logging.debug(s"{} took {}ms", name, System.currentTimeMillis() - start)
+      logging.debug(s"{} took {}ms", name, System.currentTimeMillis() - start)
     }
 
     fut
@@ -172,6 +173,6 @@ object CheckpointTracker {
 }
 
 case class CheckpointConfig(completionTimeout: Timeout = Timeout(30.seconds),
-                            maxBufferSize: Int = 100000,
+                            maxBufferSize: Int = 10000,
                             maxDurationInSeconds: Int = 60,
                             timeout: Timeout = Timeout(20.seconds))

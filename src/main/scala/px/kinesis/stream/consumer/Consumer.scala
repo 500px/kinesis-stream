@@ -165,7 +165,7 @@ object ConsumerConfig {
       .map(d => Timeout(d))
       .getOrElse(Timeout(20.seconds))
     val maxBufferSize =
-      getIntOpt("checkpoint.max-buffer-size").getOrElse(100000)
+      getIntOpt("checkpoint.max-buffer-size").getOrElse(10000)
     val maxDurationInSeconds = getDurationOpt("checkpoint.max-duration")
       .map(d => d.toSeconds.toInt)
       .getOrElse(60)

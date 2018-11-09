@@ -10,7 +10,7 @@ import px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
-import scala.collection.immutable.{Seq, SortedSet}
+import scala.collection.immutable.{Seq, Queue}
 
 class ShardCheckpointTrackerActorSpec
     extends TestKit(ActorSystem("ShardCheckpointTrackerActorSpec"))
@@ -23,7 +23,7 @@ class ShardCheckpointTrackerActorSpec
     TestKit.shutdownActorSystem(system)
   }
 
-  val emptySet = SortedSet.empty[ExtendedSequenceNumber]
+  val emptyQueue = Queue.empty[ExtendedSequenceNumber]
 
   def createTracker(maxBufferSize: Int = 10,
                     maxDurationInSeconds: Int = 10): ActorRef =
@@ -58,7 +58,7 @@ class ShardCheckpointTrackerActorSpec
       expectMsg(Ack)
 
       tracker ! Get
-      expectMsg(Details(SortedSet(tracked: _*), emptySet))
+      expectMsg(Details(Queue(tracked: _*), emptyQueue))
     }
   }
 
@@ -93,7 +93,7 @@ class ShardCheckpointTrackerActorSpec
       expectMsg(Ack)
 
       tracker ! Get
-      expectMsg(Details(SortedSet(tracked: _*), SortedSet(toSequenceNum(1))))
+      expectMsg(Details(Queue(tracked: _*), Queue(toSequenceNum(1))))
     }
 
     it(
@@ -108,7 +108,7 @@ class ShardCheckpointTrackerActorSpec
       expectMsg(Ack)
 
       tracker ! Get
-      expectMsg(Details(SortedSet(tracked: _*), emptySet))
+      expectMsg(Details(Queue(tracked: _*), emptyQueue))
 
       tracker ! Process(toSequenceNum(1))
       expectMsg(Ack)
@@ -201,7 +201,7 @@ class ShardCheckpointTrackerActorSpec
       expectMsg(Checkpointed(Some(toSequenceNum(3))))
 
       tracker ! Get
-      expectMsg(Details(emptySet, emptySet))
+      expectMsg(Details(emptyQueue, emptyQueue))
     }
 
     it("should checkpoint regardless of max buffer or duration if forced=true") {
@@ -226,7 +226,7 @@ class ShardCheckpointTrackerActorSpec
       expectMsg(Checkpointed(Some(toSequenceNum(3))))
 
       tracker ! Get
-      expectMsg(Details(emptySet, emptySet))
+      expectMsg(Details(emptyQueue, emptyQueue))
     }
 
     it("should not checkpoint if there is no sequence number checkpointable") {
