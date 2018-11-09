@@ -30,26 +30,15 @@ class ShardCheckpointTrackerActor(shardId: String,
   override def receive: Receive = {
     case Track(sequenceNumbers) =>
       log.debug("Tracking: {}", sequenceNumbers.map(formatSeqNum).mkString(","))
-      log.debug("Total Tracked: {}", tracked.size)
-      val start = System.currentTimeMillis()
       tracked ++= sequenceNumbers
-      val end = System.currentTimeMillis()
-      log.info("Track in actor: {} ms, tracked size: {}, processed size: {}",
-               end - start,
-               tracked.size,
-               processed.size)
       sender() ! Ack
     case Process(sequenceNumber: ExtendedSequenceNumber) =>
       log.debug("Marked: {}", formatSeqNum(sequenceNumber))
-      val start = System.currentTimeMillis()
+
       if (lastCheckpoint.forall(c => ordering.gt(sequenceNumber, c))) {
         processed += sequenceNumber
       }
-      val end = System.currentTimeMillis()
-      log.debug("Process in actor: {} ms, tracked size: {}, processed size: {}",
-                end - start,
-                tracked.size,
-                processed.size)
+
       sender() ! Ack
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>
