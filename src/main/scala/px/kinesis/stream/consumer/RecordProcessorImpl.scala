@@ -6,17 +6,14 @@ import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{KillSwitch, QueueOfferResult}
 import px.kinesis.stream.consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
-import software.amazon.kinesis.processor.{
-  RecordProcessorCheckpointer,
-  ShardRecordProcessor
-}
+import software.amazon.kinesis.processor.{RecordProcessorCheckpointer, ShardRecordProcessor}
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
 import scala.collection.immutable.Seq
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.util.Try
+import scala.util.{Failure, Try}
 class RecordProcessorImpl(
     queue: SourceQueueWithComplete[Seq[Record]],
     tracker: CheckpointTracker,
@@ -52,7 +49,7 @@ class RecordProcessorImpl(
   }
 
   def trackRecords(records: Seq[Record]): Unit =
-    blockAndTerminateOnFailure(
+    blocking(
       "trackRecords",
       tracker.track(shardId, records.map(_.extendedSequenceNumber)))
 
@@ -105,7 +102,7 @@ class RecordProcessorImpl(
   }
 
   def checkpointIfNeeded(checkpointer: RecordProcessorCheckpointer): Unit =
-    blockAndTerminateOnFailure(
+    blocking(
       "consumer/checkpoint",
       tracker.checkpointIfNeeded(shardId, checkpointer))
 
@@ -121,7 +118,7 @@ class RecordProcessorImpl(
         Done
       }
 
-    blockAndTerminateOnFailure("checkpointForShardEnd", completion)
+    blockAndThrowOnFailure(completion)
   }
 
   def checkpointForShutdown(checkpointer: RecordProcessorCheckpointer): Unit = {
@@ -133,16 +130,32 @@ class RecordProcessorImpl(
       .flatMap(_ => tracker.checkpoint(shardId, checkpointer))
       .recover { case _ => Done }
 
-    blockAndTerminateOnFailure("checkpointForShutdown", completion)
+    blockAndThrowOnFailure(completion)
   }
 
-  def blockAndTerminateOnFailure[A](name: String,
-                                    future: Future[A]): Either[Throwable, A] = {
-    Try(Await.result(future, Duration.Inf)).toEither.left.map { ex =>
-      logging.error(ex, s"Failed on $name")
-      killSwitch.abort(ex)
-      ex
+  /**
+    * Blocks and absorbs errors into a Try
+    * @param name
+    * @param future
+    * @tparam A
+    * @return
+    */
+  def blocking[A](name: String,
+                  future: Future[A]): Try[A] = {
+    Try(Await.result(future, Duration.Inf)).recoverWith {
+      case ex: Throwable =>
+        logging.error(ex, "Failed on {}", name)
+        Failure(ex)
     }
+  }
+
+  /**
+    * Block and throw exception on failure
+    * @param t
+    * @tparam A
+    */
+  def blockAndThrowOnFailure[A](fut: Future[A]): Unit = {
+    Await.result(fut, Duration.Inf)
   }
 
 }
