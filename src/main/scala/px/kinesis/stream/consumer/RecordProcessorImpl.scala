@@ -6,7 +6,10 @@ import akka.stream.scaladsl.SourceQueueWithComplete
 import akka.stream.{KillSwitch, QueueOfferResult}
 import px.kinesis.stream.consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.lifecycle.events._
-import software.amazon.kinesis.processor.{RecordProcessorCheckpointer, ShardRecordProcessor}
+import software.amazon.kinesis.processor.{
+  RecordProcessorCheckpointer,
+  ShardRecordProcessor
+}
 import software.amazon.kinesis.retrieval.KinesisClientRecord
 
 import scala.collection.JavaConverters._
@@ -49,9 +52,8 @@ class RecordProcessorImpl(
   }
 
   def trackRecords(records: Seq[Record]): Unit =
-    blocking(
-      "trackRecords",
-      tracker.track(shardId, records.map(_.extendedSequenceNumber)))
+    blocking("trackRecords",
+             tracker.track(shardId, records.map(_.extendedSequenceNumber)))
 
   def enqueueRecords(records: Seq[Record]) = {
 
@@ -102,9 +104,8 @@ class RecordProcessorImpl(
   }
 
   def checkpointIfNeeded(checkpointer: RecordProcessorCheckpointer): Unit =
-    blocking(
-      "consumer/checkpoint",
-      tracker.checkpointIfNeeded(shardId, checkpointer))
+    blocking("consumer/checkpoint",
+             tracker.checkpointIfNeeded(shardId, checkpointer))
 
   def checkpointForShardEnd(checkpointer: RecordProcessorCheckpointer): Unit = {
     // wait for all in flight to be marked processed
@@ -140,8 +141,7 @@ class RecordProcessorImpl(
     * @tparam A
     * @return
     */
-  def blocking[A](name: String,
-                  future: Future[A]): Try[A] = {
+  def blocking[A](name: String, future: Future[A]): Try[A] = {
     Try(Await.result(future, Duration.Inf)).recoverWith {
       case ex: Throwable =>
         logging.error(ex, "Failed on {}", name)
