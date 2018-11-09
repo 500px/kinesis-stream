@@ -54,9 +54,8 @@ class CheckpointTrackerActor(workerId: String,
   }
 
   def createShardTracker(shardId: String): ActorRef = {
-    context.actorOf(ShardCheckpointTrackerActor.props(shardId,
-                                                      maxBufferSize,
-                                                      maxDurationInSeconds),
+    context.actorOf(ShardCheckpointTrackerActor
+                      .props(shardId, maxBufferSize, maxDurationInSeconds),
                     shardId)
   }
 
