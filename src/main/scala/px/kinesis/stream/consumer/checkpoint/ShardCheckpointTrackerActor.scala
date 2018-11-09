@@ -47,9 +47,9 @@ class ShardCheckpointTrackerActor(shardId: String,
       }
       val end = System.currentTimeMillis()
       log.debug("Process in actor: {} ms, tracked size: {}, processed size: {}",
-               end - start,
-               tracked.size,
-               processed.size)
+                end - start,
+                tracked.size,
+                processed.size)
       sender() ! Ack
       notifyIfCompleted()
     case CheckpointIfNeeded(checkpointer, force) =>

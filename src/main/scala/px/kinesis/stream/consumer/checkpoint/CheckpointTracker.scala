@@ -130,7 +130,7 @@ class CheckpointTracker(
     val start = System.currentTimeMillis()
     fut.onComplete {
       case _ =>
-      logging.debug(s"{} took {}ms", name, System.currentTimeMillis() - start)
+        logging.debug(s"{} took {}ms", name, System.currentTimeMillis() - start)
     }
 
     fut
