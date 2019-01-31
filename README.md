@@ -2,8 +2,99 @@
 
 A wrapper around KCL 2.x which exposes an Akka Streams source to consume messages off of a Kinesis Data Stream.
 
+## Requirements
+- Scala >= 2.12.x or >= 2.11.12
+- Akka Streams >= 2.5.14
 
-## Required Policies
+## Usage
+
+**build.sbt**
+
+```scala
+libraryDependencies += "com.500px" %% "kinesis-stream" % "0.1.2"
+```
+
+**note**: Due to java package names not allowing numbers, the import path for the project is `px.kinesis.stream.consumer`.
+
+### Simple Example (At Most Once Delivery)
+
+In the following example, we consume from a stream named `test-stream` and name our kinesis application `test-app`.
+
+*note: To test this example out, you will need the [required IAM policies](#required-iam-permissions).* 
+
+```scala
+import akka.Done
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.{Keep, RunnableGraph, Sink}
+import px.kinesis.stream.consumer
+
+import scala.concurrent.Future
+
+object Main extends App {
+
+  implicit val system = ActorSystem("kinesis-source")
+  implicit val ec = system.dispatcher
+  implicit val mat = ActorMaterializer()
+
+  // A simple consumer that will print to the console for now
+  val console = Sink.foreach[String](println)
+
+  val runnableGraph: RunnableGraph[Future[Done]] =
+    consumer
+      .source("test-stream", "test-app")
+      .via(consumer.commitFlow(parallelism = 2))
+      .map(r => r.data.utf8String)
+      .toMat(console)(Keep.left)
+
+  val done = runnableGraph.run()
+  done.onComplete(_ => {
+    println("Shutdown completed")
+    system.terminate()
+  })
+
+}
+
+```
+
+### Configuration using hocon
+
+The Kinesis Consumer can be configured via HOCON configuration as is common for Akka projects
+
+```hocon
+example.consumer {
+  application-name = "test-app" # name of the application (consumer group)
+  stream-name = "test-stream" # name of the stream to connect to
+
+  position {
+    initial = "latest" # (latest, trim-horizon, at-timestamp). defaults to latest
+    #time = "" # Only set if position is at-timestamp. Supports a valid Java Date parseable datetime string
+  }
+
+  checkpoint {
+    #completion-timeout = "30s" # When a Shard End / Shutdown event occurs, this timeout determines how long to wait for all in-flight messages to be marked processed. Defaults to 30s
+    #timeout = "20s" # timeout for checkpoints to complete. (Checkpoints are completed when the checkpoint actor accepts the checkpoint sequence number). defaults to 20s
+    #max-buffer-size = 10000 # Maximum number of records to process before calling checkpoint (internally). All messages MUST be marked processed by client, before they can be considered for checkpointing.
+    #max-duration = "60s" # Max duration to wait between checkpoint calls
+  }
+}
+```
+
+Configuring the consumer using `ConsumerConfig`.
+
+```scala
+//...
+
+consumer.source(ConsumerConfig.fromConfig(system.settings.config.getConfig("example.consumer")))
+
+```
+
+### Configuring using native AWS SDK config
+
+The `ConsumerConfig` class has methods for accepting raw AWS SDK clients which can be configured. If you require very
+custom configuration, this option is available.
+
+## Required IAM Permissions
 
 The following IAM permissions are required to use KCL 2.x
 

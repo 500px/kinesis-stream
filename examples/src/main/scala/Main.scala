@@ -1,30 +1,30 @@
+import akka.Done
 import akka.actor.ActorSystem
-import akka.event.{Logging, LoggingAdapter}
 import akka.stream.ActorMaterializer
-import akka.stream.scaladsl.{Keep, Sink}
-import px.kinesis.stream.consumer.{Consumer, ConsumerConfig}
+import akka.stream.scaladsl.{Keep, RunnableGraph, Sink}
+import px.kinesis.stream.consumer
+
+import scala.concurrent.Future
 
 object Main extends App {
 
   implicit val system = ActorSystem("kinesis-source")
   implicit val ec = system.dispatcher
   implicit val mat = ActorMaterializer()
-  implicit val logging: LoggingAdapter = Logging(system, "Example")
 
   // A simple consumer that will print to the console for now
-  val consumer = Sink.foreach[String](s => logging.info(s))
-  val ignore = Sink.ignore
+  val console = Sink.foreach[String](println)
 
-  val runnableGraph =
-    Consumer
-      .source(ConsumerConfig.fromConfig(system.settings.config.getConfig("consumer")))
-      .mapAsync(8)(r => r.markProcessed().map(_ => r))
-      //.map(r => s"${r.sequenceNumber.takeRight(10)} /${r.shardId} - ${r.key}")
-      .toMat(ignore)(Keep.left)
+  val runnableGraph: RunnableGraph[Future[Done]] =
+    consumer
+      .source("test-stream", "test-app")
+      .via(consumer.commitFlow(parallelism = 2))
+      .map(r => r.data.utf8String)
+      .toMat(console)(Keep.left)
 
   val done = runnableGraph.run()
   done.onComplete(_ => {
-    logging.info("Shutdown completed")
+    println("Shutdown completed")
     system.terminate()
   })
 

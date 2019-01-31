@@ -1,16 +1,15 @@
-package consumer.checkpoint
+package px.kinesis.stream.consumer.checkpoint
 
 import akka.actor.Status.Failure
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit, TestProbe}
-import px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
-import px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor
+import px.kinesis.stream.consumer.checkpoint.ShardCheckpointTrackerActor._
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
-import scala.collection.immutable.{Seq, Queue}
+import scala.collection.immutable.{Queue, Seq}
 
 class ShardCheckpointTrackerActorSpec
     extends TestKit(ActorSystem("ShardCheckpointTrackerActorSpec"))

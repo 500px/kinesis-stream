@@ -25,7 +25,7 @@ import scala.concurrent.duration._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
 import scala.concurrent.{ExecutionContext, Future}
 
-object Consumer {
+trait Consumer {
 
   /**
     * Returns a Source which emits checkpointable Records from the Kinesis stream.
