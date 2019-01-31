@@ -7,4 +7,8 @@ echo "Setting version for project to $tag"
 echo "version in ThisBuild := \"$tag\"" > version.sbt
 
 sbt +publishSigned
-sbt +sonatypeRelease
+
+if [[ ! "${tag}" == *"-SNAPSHOT" ]];then
+    echo "Promoting ${tag} as a release"
+    sbt sonatypeReleaseAll
+fi
