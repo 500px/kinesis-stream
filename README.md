@@ -12,7 +12,7 @@ A wrapper around KCL 2.x which exposes an Akka Streams source to consume message
 **build.sbt**
 
 ```scala
-libraryDependencies += "com.500px" %% "kinesis-stream" % "0.1.2"
+libraryDependencies += "com.500px" %% "kinesis-stream" % "0.1.3"
 ```
 
 **note**: Due to java package names not allowing numbers, the import path for the project is `px.kinesis.stream.consumer`.
