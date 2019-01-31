@@ -1,4 +1,5 @@
 # Kinesis Stream
+[![Build Status](https://travis-ci.com/500px/kinesis-stream.svg?branch=master)](https://travis-ci.com/500px/kinesis-stream)
 
 A wrapper around KCL 2.x which exposes an Akka Streams source to consume messages off of a Kinesis Data Stream.
 
