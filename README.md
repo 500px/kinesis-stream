@@ -40,10 +40,12 @@ object Main extends App {
   // A simple consumer that will print to the console for now
   val console = Sink.foreach[String](println)
 
+  // In this example, commit as soon as we consume a record, giving us at-most-once delivery semantics.
+  // To achieve at-least-once, we would commit after processing the record
   val runnableGraph: RunnableGraph[Future[Done]] =
     consumer
       .source("test-stream", "test-app")
-      .via(consumer.commitFlow(parallelism = 2))
+      .via(consumer.commitFlow(parallelism = 2)) // convenience flow to commit records (marking records processed)
       .map(r => r.data.utf8String)
       .toMat(console)(Keep.left)
 
