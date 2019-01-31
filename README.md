@@ -97,6 +97,17 @@ consumer.source(ConsumerConfig.fromConfig(system.settings.config.getConfig("exam
 The `ConsumerConfig` class has methods for accepting raw AWS SDK clients which can be configured. If you require very
 custom configuration, this option is available.
 
+## Gotchas
+
+### Checkpointing
+
+You MUST ensure to mark all in-flight messages as processed. The checkpoint tracking component needs to keep track
+of all in-flight messages and as such, could run out of memory if messages are not marked as processed regularly.
+
+If you choose to do at-most-once processing, a simple solution is to mark a record as processed as soon as it arrives on
+the stream.
+
+
 ## Required IAM Permissions
 
 The following IAM permissions are required to use KCL 2.x
@@ -160,3 +171,7 @@ The following IAM permissions are required to use KCL 2.x
     }
   }
 ```
+
+# Improvements
+
+- Implement a RecordProcessor which does not use a checkpoint tracker to allow for a simpler at-most-once processing.
