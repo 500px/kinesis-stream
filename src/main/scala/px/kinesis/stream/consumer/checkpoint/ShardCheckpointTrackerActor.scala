@@ -133,18 +133,23 @@ class ShardCheckpointTrackerActor(shardId: String,
 
 object ShardCheckpointTrackerActor {
   case object Ack
+
+  sealed trait Command
   case class Track(sequenceNumbers: Iterable[ExtendedSequenceNumber])
-  case class Process(sequenceNumber: ExtendedSequenceNumber)
+      extends Command
+  case class Process(sequenceNumber: ExtendedSequenceNumber) extends Command
   case class CheckpointIfNeeded(checkpointer: RecordProcessorCheckpointer,
                                 force: Boolean = false)
+      extends Command
 
   case class Details(tracked: Queue[ExtendedSequenceNumber],
                      checkpointable: Queue[ExtendedSequenceNumber])
   case class Checkpointed(sequenceNumber: Option[ExtendedSequenceNumber] = None)
-  case object WatchCompletion
+
+  case object WatchCompletion extends Command
   case object Completed
-  case object Get
-  case object Shutdown
+  case object Get extends Command
+  case object Shutdown extends Command
 
   def props(shardId: String,
             maxBufferSize: Int,

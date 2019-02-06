@@ -31,6 +31,7 @@ class RecordProcessorImpl(
     logging.info("Started consumer.Record Processor {} for Worker: {}",
                  initializationInput.shardId(),
                  workerId)
+    blocking("startingTracker", tracker.start(initializationInput.shardId()))
     shardId = initializationInput.shardId()
   }
 
