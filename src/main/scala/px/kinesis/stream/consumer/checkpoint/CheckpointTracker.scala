@@ -98,6 +98,21 @@ class CheckpointTracker(
   }
 
   /**
+    * Creates/starts a tracker for a particular shard.
+    * Should be called when record processor initializes
+    * @param shardId
+    * @return
+    */
+  def start(shardId: String): Future[Done] = {
+    if (!isShutdown) {
+      tracker
+        .ask(Create(shardId))(timeout)
+        .map(_ => Done)
+        .recoverWith(mapAskTimeout("start", shardId))
+    } else Future.successful(Done)
+  }
+
+  /**
     * Shuts down the tracker for a particular shard
     * @param shardId
     * @return
