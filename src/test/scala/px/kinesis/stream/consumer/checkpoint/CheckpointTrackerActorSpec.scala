@@ -84,5 +84,6 @@ class CheckpointTrackerActorSpec
       expectMsg(shard.Ack)
 
     }
+
   }
 }
