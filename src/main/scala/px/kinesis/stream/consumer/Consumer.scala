@@ -20,6 +20,7 @@ import software.amazon.kinesis.common.{
 import software.amazon.kinesis.coordinator.CoordinatorConfig
 import software.amazon.kinesis.leases.LeaseManagementConfig
 import software.amazon.kinesis.metrics.MetricsConfig
+import software.amazon.kinesis.retrieval.RetrievalConfig
 
 import scala.concurrent.duration._
 import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
@@ -75,7 +76,8 @@ case class ConsumerConfig(
         InitialPositionInStream.LATEST),
     coordinatorConfig: Option[CoordinatorConfig] = None,
     leaseManagementConfig: Option[LeaseManagementConfig] = None,
-    metricsConfig: Option[MetricsConfig] = None) {
+    metricsConfig: Option[MetricsConfig] = None,
+    retrievalConfig: Option[RetrievalConfig] = None) {
 
   def withInitialStreamPosition(
       position: InitialPositionInStream): ConsumerConfig = {
@@ -96,6 +98,8 @@ case class ConsumerConfig(
     this.copy(leaseManagementConfig = Some(config))
   def withMetricsConfig(config: MetricsConfig): ConsumerConfig =
     this.copy(metricsConfig = Some(config))
+  def withRetrievalConfig(config: RetrievalConfig): ConsumerConfig =
+    this.copy(retrievalConfig = Some(config))
 }
 
 object ConsumerConfig {
