@@ -37,15 +37,15 @@ class ShardCheckpointTrackerActorSpec
     it("should track sequence numbers") {
       val tracker = createTracker()
 
-      tracker ! Track(Seq(1).map(toSequenceNum))
-      expectMsg(Ack)
+      tracker ! Command.Track(Seq(1).map(toSequenceNum))
+      expectMsg(Response.Ack)
     }
 
     it("should accept empty sequence list") {
       val tracker = createTracker()
 
-      tracker ! Track(Seq.empty[ExtendedSequenceNumber])
-      expectMsg(Ack)
+      tracker ! Command.Track(Seq.empty[ExtendedSequenceNumber])
+      expectMsg(Response.Ack)
     }
 
     it(
@@ -53,11 +53,11 @@ class ShardCheckpointTrackerActorSpec
       val tracker = createTracker()
 
       val tracked = Seq(1, 2, 3).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Get
-      expectMsg(Details(Queue(tracked: _*), emptyQueue))
+      tracker ! Command.Get
+      expectMsg(Response.Details(Queue(tracked: _*), emptyQueue))
     }
   }
 
@@ -65,19 +65,19 @@ class ShardCheckpointTrackerActorSpec
     it("should mark sequence number as processed") {
       val tracker = createTracker()
 
-      tracker ! Track(Seq(1).map(toSequenceNum))
-      expectMsg(Ack)
+      tracker ! Command.Track(Seq(1).map(toSequenceNum))
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
     }
 
     it(
       "should do nothing if sequence number is marked processed without first being tracked") {
       val tracker = createTracker()
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
     }
 
     it(
@@ -85,14 +85,14 @@ class ShardCheckpointTrackerActorSpec
       val tracker = createTracker()
 
       val tracked = Seq(1, 2, 3, 4).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
 
-      tracker ! Get
-      expectMsg(Details(Queue(tracked: _*), Queue(toSequenceNum(1))))
+      tracker ! Command.Get
+      expectMsg(Response.Details(Queue(tracked: _*), Queue(toSequenceNum(1))))
     }
 
     it(
@@ -100,23 +100,23 @@ class ShardCheckpointTrackerActorSpec
       val tracker = createTracker()
 
       val tracked = Seq(1, 2, 3, 4).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
 
-      tracker ! Get
-      expectMsg(Details(Queue(tracked: _*), emptyQueue))
+      tracker ! Command.Get
+      expectMsg(Response.Details(Queue(tracked: _*), emptyQueue))
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
 
-      tracker ! Get
+      tracker ! Command.Get
       expectMsgPF() {
-        case Details(t, set)
-            if !set.contains(toSequenceNum(3)) && t.forall(tracked.contains) =>
-          true
+        case Response.Details(t, set)
+          if !set.contains(toSequenceNum(3)) && t.forall(tracked.contains) =>
+            true
       }
     }
   }
@@ -131,19 +131,19 @@ class ShardCheckpointTrackerActorSpec
       expectCheckpointAt(checkpointer, toSequenceNum(3))
 
       val tracked = Seq(1, 2, 3, 4).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
-      tracker ! Process(toSequenceNum(2))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
+      tracker ! Command.Process(toSequenceNum(2))
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
 
-      tracker ! CheckpointIfNeeded(checkpointer)
-      expectMsg(Checkpointed(Some(toSequenceNum(3))))
+      tracker ! Command.CheckpointIfNeeded(checkpointer)
+      expectMsg(Response.CheckPointed(Some(toSequenceNum(3))))
     }
 
     it("should not checkpoint if there is nothing being tracked") {
@@ -152,8 +152,8 @@ class ShardCheckpointTrackerActorSpec
       val checkpointer = mock[RecordProcessorCheckpointer]
       expectNoCheckpoint(checkpointer)
 
-      tracker ! CheckpointIfNeeded(checkpointer)
-      expectMsg(Checkpointed(None))
+      tracker ! Command.CheckpointIfNeeded(checkpointer)
+      expectMsg(Response.CheckPointed(None))
     }
 
     it("should not checkpoint if max buffer or duration are not reached") {
@@ -163,19 +163,19 @@ class ShardCheckpointTrackerActorSpec
       expectNoCheckpoint(checkpointer)
 
       val tracked = Seq(1, 2, 3).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
-      tracker ! Process(toSequenceNum(2))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
+      tracker ! Command.Process(toSequenceNum(2))
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
 
-      tracker ! CheckpointIfNeeded(checkpointer)
-      expectMsg(Checkpointed(None))
+      tracker ! Command.CheckpointIfNeeded(checkpointer)
+      expectMsg(Response.CheckPointed(None))
     }
 
     it("should remove sequence number from tracked once it is checkpointed") {
@@ -185,22 +185,22 @@ class ShardCheckpointTrackerActorSpec
       expectCheckpointAt(checkpointer, toSequenceNum(3))
 
       val tracked = Seq(1, 2, 3).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
-      tracker ! Process(toSequenceNum(2))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
+      tracker ! Command.Process(toSequenceNum(2))
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
 
-      tracker ! CheckpointIfNeeded(checkpointer)
-      expectMsg(Checkpointed(Some(toSequenceNum(3))))
+      tracker ! Command.CheckpointIfNeeded(checkpointer)
+      expectMsg(Response.CheckPointed(Some(toSequenceNum(3))))
 
-      tracker ! Get
-      expectMsg(Details(emptyQueue, emptyQueue))
+      tracker ! Command.Get
+      expectMsg(Response.Details(emptyQueue, emptyQueue))
     }
 
     it("should checkpoint regardless of max buffer or duration if forced=true") {
@@ -210,22 +210,22 @@ class ShardCheckpointTrackerActorSpec
       expectCheckpointAt(checkpointer, toSequenceNum(3))
 
       val tracked = Seq(1, 2, 3).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
-      tracker ! Process(toSequenceNum(2))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
+      tracker ! Command.Process(toSequenceNum(2))
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
 
-      tracker ! CheckpointIfNeeded(checkpointer, force = true)
-      expectMsg(Checkpointed(Some(toSequenceNum(3))))
+      tracker ! Command.CheckpointIfNeeded(checkpointer, force = true)
+      expectMsg(Response.CheckPointed(Some(toSequenceNum(3))))
 
-      tracker ! Get
-      expectMsg(Details(emptyQueue, emptyQueue))
+      tracker ! Command.Get
+      expectMsg(Response.Details(emptyQueue, emptyQueue))
     }
 
     it("should not checkpoint if there is no sequence number checkpointable") {
@@ -235,16 +235,16 @@ class ShardCheckpointTrackerActorSpec
       expectNoCheckpoint(checkpointer)
 
       val tracked = Seq(1, 2, 3).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
-      tracker ! Process(toSequenceNum(2))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
+      tracker ! Command.Process(toSequenceNum(2))
+      expectMsg(Response.Ack)
 
-      tracker ! CheckpointIfNeeded(checkpointer, force = true)
-      expectMsg(Checkpointed(None))
+      tracker ! Command.CheckpointIfNeeded(checkpointer, force = true)
+      expectMsg(Response.CheckPointed(None))
     }
 
   }
@@ -255,25 +255,25 @@ class ShardCheckpointTrackerActorSpec
       val tracker = createTracker()
 
       val tracked = Seq(1, 2, 3).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
       val watcher = TestProbe("watcher")
-      watcher.send(tracker, WatchCompletion)
+      watcher.send(tracker, Command.WatchCompletion)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
-
-      watcher.expectNoMessage()
-      tracker ! Process(toSequenceNum(2))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
 
       watcher.expectNoMessage()
+      tracker ! Command.Process(toSequenceNum(2))
+      expectMsg(Response.Ack)
 
-      tracker ! Process(toSequenceNum(1))
-      expectMsg(Ack)
+      watcher.expectNoMessage()
 
-      watcher.expectMsg(Completed)
+      tracker ! Command.Process(toSequenceNum(1))
+      expectMsg(Response.Ack)
+
+      watcher.expectMsg(Response.Completed)
     }
 
     it(
@@ -281,20 +281,20 @@ class ShardCheckpointTrackerActorSpec
       val tracker = createTracker()
 
       val tracked = Seq(1, 2, 3).map(toSequenceNum)
-      tracker ! Track(tracked)
-      expectMsg(Ack)
+      tracker ! Command.Track(tracked)
+      expectMsg(Response.Ack)
 
       val watcher = TestProbe("watcher")
-      watcher.send(tracker, WatchCompletion)
+      watcher.send(tracker, Command.WatchCompletion)
 
-      tracker ! Process(toSequenceNum(3))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(3))
+      expectMsg(Response.Ack)
 
       watcher.expectNoMessage()
-      tracker ! Process(toSequenceNum(2))
-      expectMsg(Ack)
+      tracker ! Command.Process(toSequenceNum(2))
+      expectMsg(Response.Ack)
 
-      tracker ! Shutdown
+      tracker ! Command.Shutdown
       watcher.expectMsgPF() {
         case Failure(_) => true
       }

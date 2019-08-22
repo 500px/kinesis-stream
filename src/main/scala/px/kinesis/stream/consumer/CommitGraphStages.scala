@@ -1,5 +1,6 @@
 package px.kinesis.stream.consumer
 
+import akka.NotUsed
 import akka.stream.scaladsl.Flow
 
 import scala.concurrent.ExecutionContext
@@ -12,6 +13,6 @@ trait CommitGraphStages {
     * @param ec
     * @return
     */
-  def commitFlow(parallelism: Int = 1)(implicit ec: ExecutionContext) =
+  def commitFlow(parallelism: Int = 1)(implicit ec: ExecutionContext): Flow[Record, Record, NotUsed] =
     Flow[Record].mapAsync(parallelism)(r => r.markProcessed().map(_ => r))
 }

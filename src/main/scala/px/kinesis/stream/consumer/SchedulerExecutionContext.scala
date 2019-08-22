@@ -16,5 +16,7 @@ object SchedulerExecutionContext {
         new ThreadFactoryBuilder()
           .setNameFormat(s"$name-%04d")
           .setDaemon(true)
-          .build))
+          .build
+      )
+    )
 }
