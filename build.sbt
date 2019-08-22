@@ -84,10 +84,7 @@ lazy val root = (project in file("."))
   .settings(dependencySettings)
   .settings(
     parallelExecution in Test := false,
-    logBuffered in Test := false,
-    scalafmtOnCompile in ThisBuild := true, // all projects
-    scalafmtOnCompile := true, // current project
-    scalafmtOnCompile in Compile := true
+    logBuffered in Test := false
   )
 
 // examples
