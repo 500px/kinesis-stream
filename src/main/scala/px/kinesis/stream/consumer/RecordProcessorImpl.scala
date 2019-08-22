@@ -22,10 +22,10 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 class RecordProcessorImpl(
-    queue: SourceQueueWithComplete[Seq[Record]],
-    tracker: CheckpointTracker,
-    killSwitch: KillSwitch,
-    workerId: String
+  queue: SourceQueueWithComplete[Seq[Record]],
+  tracker: CheckpointTracker,
+  killSwitch: KillSwitch,
+  workerId: String
 )(implicit ec: ExecutionContext, logging: LoggingAdapter) extends ShardRecordProcessor {
 
   val EnqueueBatchSize = 100
@@ -58,7 +58,7 @@ class RecordProcessorImpl(
   def trackRecords(records: Seq[Record]): Unit =
     blockAndThrowOnFailure(tracker.track(shardId, records.map(_.extendedSequenceNumber)))
 
-  def enqueueRecords(records: Seq[Record]): Unit = {
+  def enqueueRecords(records: Seq[Record]): Unit =
     if (continueProcessing()) {
       try {
         val offerResult = Await.result(queue.offer(records), Duration.Inf)
@@ -86,7 +86,6 @@ class RecordProcessorImpl(
           throw ex
       }
     }
-  }
 
   override def leaseLost(leaseLostInput: LeaseLostInput): Unit = {
 
