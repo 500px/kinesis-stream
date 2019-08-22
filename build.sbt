@@ -18,7 +18,7 @@ val akkaStreamV = "2.5.14"
 
 val dependencySettings = Seq(
   libraryDependencies ++= Seq(
-    "software.amazon.kinesis" % "amazon-kinesis-client" % "2.0.4",
+    "software.amazon.kinesis" % "amazon-kinesis-client" % "2.2.2",
     "com.typesafe.akka" %% "akka-stream" % akkaStreamV,
     "com.typesafe.akka" %% "akka-slf4j" % akkaStreamV,
     "ch.qos.logback" % "logback-classic" % "1.2.3",
