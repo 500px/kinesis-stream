@@ -1,7 +1,7 @@
 import sbt.Keys.{parallelExecution, scalacOptions}
 
-val scala11 = "2.11.12"
-val scala12 = "2.12.7"
+val scala12 = "2.12.10"
+val scala13 = "2.13.1"
 
 val scalaSettings = Seq(
   scalaVersion := scala12,
@@ -11,22 +11,22 @@ val scalaSettings = Seq(
     "-feature", // Emit warning and location for usages of features that should be imported explicitly.
     "-Ywarn-dead-code" // Warn when dead code is identified.
   ),
-  crossScalaVersions := List(scala12, scala11)
+  crossScalaVersions := List(scala12, scala13)
 )
 
-val akkaStreamV = "2.5.14"
+val akkaStreamV = "2.6.0"
 
 val dependencySettings = Seq(
   libraryDependencies ++= Seq(
-    "software.amazon.kinesis" % "amazon-kinesis-client" % "2.2.2",
-    "com.typesafe.akka" %% "akka-stream" % akkaStreamV,
-    "com.typesafe.akka" %% "akka-slf4j" % akkaStreamV,
-    "ch.qos.logback" % "logback-classic" % "1.2.3",
-    "com.typesafe.scala-logging" %% "scala-logging" % "3.9.0",
-    "org.codehaus.groovy" % "groovy-all" % "2.4.1",
-    "org.scalamock" %% "scalamock" % "4.1.0" % Test,
-    "org.scalatest" %% "scalatest" % "3.0.5" % Test,
-    "com.typesafe.akka" %% "akka-stream-testkit" % akkaStreamV % Test
+    "software.amazon.kinesis"     % "amazon-kinesis-client"  % "2.2.6",
+    "com.typesafe.akka"          %% "akka-stream"            % akkaStreamV,
+    "com.typesafe.akka"          %% "akka-slf4j"             % akkaStreamV,
+    "ch.qos.logback"              % "logback-classic"        % "1.2.3",
+    "com.typesafe.scala-logging" %% "scala-logging"          % "3.9.2",
+    "org.codehaus.groovy"         % "groovy-all"             % "2.5.8",
+    "org.scalamock"              %% "scalamock"              % "4.4.0"      % Test,
+    "org.scalatest"              %% "scalatest"              % "3.1.0"      % Test,
+    "com.typesafe.akka"          %% "akka-stream-testkit"    % akkaStreamV  % Test
   )
 )
 

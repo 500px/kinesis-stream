@@ -1,13 +1,12 @@
 package px.kinesis.stream.consumer.checkpoint
 
 import akka.Done
-import akka.actor.{Actor, ActorSystem}
+import akka.actor.{Actor, ActorRef, ActorSystem}
 import akka.pattern.{AskTimeoutException, ask}
 import akka.util.Timeout
 import px.kinesis.stream.consumer.checkpoint.CheckpointTrackerActor._
 import software.amazon.kinesis.processor.RecordProcessorCheckpointer
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
-
 import scala.collection.immutable.Iterable
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -22,7 +21,7 @@ class CheckpointTracker(
 
   @volatile var isShutdown = false
 
-  val tracker =
+  val tracker: ActorRef =
     system.actorOf(
       CheckpointTrackerActor.props(workerId, maxBufferSize, maxDurationInSeconds),
       s"tracker-${workerId.take(5)}"
@@ -148,7 +147,7 @@ object CheckpointTracker {
   )
 
   def apply(workerId: String, maxBufferSize: Int, maxDurationInSeconds: Int, completionTimeout: Timeout, timeout: Timeout)
-    (implicit system: ActorSystem, ec: ExecutionContext) =
+    (implicit system: ActorSystem, ec: ExecutionContext): CheckpointTracker =
       new CheckpointTracker(
         workerId,
         maxBufferSize,
@@ -157,7 +156,7 @@ object CheckpointTracker {
         timeout
       )
 
-  def apply(workerId: String, config: CheckpointConfig)(implicit system: ActorSystem, ec: ExecutionContext) =
+  def apply(workerId: String, config: CheckpointConfig)(implicit system: ActorSystem, ec: ExecutionContext): CheckpointTracker =
     new CheckpointTracker(
       workerId,
       config.maxBufferSize,

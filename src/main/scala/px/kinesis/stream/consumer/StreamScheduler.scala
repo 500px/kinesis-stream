@@ -1,7 +1,7 @@
 package px.kinesis.stream.consumer
 
 import akka.actor.ActorSystem
-import akka.event.Logging
+import akka.event.{Logging, LoggingAdapter}
 import akka.stream.scaladsl.Sink
 import akka.stream.{ActorMaterializer, KillSwitch}
 import akka.{Done, NotUsed}
@@ -19,7 +19,7 @@ class StreamScheduler(config: ConsumerConfig)(
   terminationFuture: Future[Done]
 )(implicit am: ActorMaterializer, system: ActorSystem, ec: ExecutionContext) {
 
-  implicit val logging = Logging(system, "Kinesis")
+  implicit val logging: LoggingAdapter = Logging(system, "Kinesis")
 
   private val tracker = CheckpointTracker(config.workerId, config.checkpointConfig)
   private val scheduler: Scheduler = createScheduler(config)(publishSink, killSwitch)
