@@ -6,24 +6,20 @@ import java.util.{Date, UUID}
 import akka.Done
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Keep, MergeHub, Source}
-import akka.stream.{ActorMaterializer, KillSwitches}
+import akka.stream.{KillSwitches, Materializer}
 import akka.util.Timeout
 import com.typesafe.config.Config
 import px.kinesis.stream.consumer.checkpoint.CheckpointTracker.CheckpointConfig
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.kinesis.KinesisAsyncClient
-import software.amazon.kinesis.common.{
-  InitialPositionInStream,
-  InitialPositionInStreamExtended
-}
+import software.amazon.kinesis.common.{InitialPositionInStream, InitialPositionInStreamExtended}
 import software.amazon.kinesis.coordinator.CoordinatorConfig
 import software.amazon.kinesis.leases.LeaseManagementConfig
 import software.amazon.kinesis.metrics.MetricsConfig
 import software.amazon.kinesis.retrieval.RetrievalConfig
 
-import scala.concurrent.duration._
-import scala.concurrent.duration.{FiniteDuration, MILLISECONDS}
+import scala.concurrent.duration.{FiniteDuration, MILLISECONDS, _}
 import scala.concurrent.{ExecutionContext, Future}
 
 trait Consumer {
@@ -39,7 +35,7 @@ trait Consumer {
     * @return
     */
   def source(config: ConsumerConfig)
-  (implicit am: ActorMaterializer, system: ActorSystem, ec: ExecutionContext): Source[Record, Future[Done]] =
+  (implicit am: Materializer, system: ActorSystem, ec: ExecutionContext): Source[Record, Future[Done]] =
     MergeHub
       .source[Record](perProducerBufferSize = 1)
       .viaMat(KillSwitches.single)(Keep.both)
@@ -52,7 +48,7 @@ trait Consumer {
       }
 
   def source(streamName: String, appName: String)
-  (implicit am: ActorMaterializer, system: ActorSystem, ec: ExecutionContext): Source[Record, Future[Done]] =
+  (implicit am: Materializer, system: ActorSystem, ec: ExecutionContext): Source[Record, Future[Done]] =
     source(ConsumerConfig(streamName, appName))
 }
 

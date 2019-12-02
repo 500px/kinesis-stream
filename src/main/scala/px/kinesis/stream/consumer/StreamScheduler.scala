@@ -3,7 +3,7 @@ package px.kinesis.stream.consumer
 import akka.actor.ActorSystem
 import akka.event.{Logging, LoggingAdapter}
 import akka.stream.scaladsl.Sink
-import akka.stream.{ActorMaterializer, KillSwitch}
+import akka.stream.{KillSwitch, Materializer}
 import akka.{Done, NotUsed}
 import px.kinesis.stream.consumer.checkpoint.CheckpointTracker
 import software.amazon.kinesis.common.ConfigsBuilder
@@ -17,7 +17,7 @@ class StreamScheduler(config: ConsumerConfig)(
   publishSink: Sink[Record, NotUsed],
   killSwitch: KillSwitch,
   terminationFuture: Future[Done]
-)(implicit am: ActorMaterializer, system: ActorSystem, ec: ExecutionContext) {
+)(implicit am: Materializer, system: ActorSystem, ec: ExecutionContext) {
 
   implicit val logging: LoggingAdapter = Logging(system, "Kinesis")
 
@@ -103,7 +103,7 @@ object StreamScheduler {
     publishSink: Sink[Record, NotUsed],
     killSwitch: KillSwitch,
     terminationFuture: Future[Done]
-  )(implicit am: ActorMaterializer, system: ActorSystem, ec: ExecutionContext): StreamScheduler =
+  )(implicit am: Materializer, system: ActorSystem, ec: ExecutionContext): StreamScheduler =
     new StreamScheduler(config)(publishSink, killSwitch, terminationFuture)
 }
 
