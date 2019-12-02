@@ -4,12 +4,11 @@ import akka.actor.Status.Failure
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.must.Matchers
 import px.kinesis.stream.consumer.checkpoint.CheckpointTrackerActor._
-import px.kinesis.stream.consumer.checkpoint.{
-  ShardCheckpointTrackerActor => shard
-}
-import software.amazon.kinesis.processor.RecordProcessorCheckpointer
+import px.kinesis.stream.consumer.checkpoint.{ShardCheckpointTrackerActor => shard}
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.Seq
@@ -17,7 +16,7 @@ import scala.collection.immutable.Seq
 class CheckpointTrackerActorSpec
     extends TestKit(ActorSystem("CheckpointTrackerActorSpec"))
     with ImplicitSender
-    with FunSpecLike
+    with AnyFunSpecLike
     with Matchers
     with BeforeAndAfterAll
     with MockFactory {
