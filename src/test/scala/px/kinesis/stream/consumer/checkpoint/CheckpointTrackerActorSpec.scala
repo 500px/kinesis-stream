@@ -4,12 +4,11 @@ import akka.actor.Status.Failure
 import akka.actor.{ActorRef, ActorSystem}
 import akka.testkit.{ImplicitSender, TestKit}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{BeforeAndAfterAll, FunSpecLike, Matchers}
+import org.scalatest.funspec.AnyFunSpecLike
+import org.scalatest.BeforeAndAfterAll
+import org.scalatest.matchers.must.Matchers
 import px.kinesis.stream.consumer.checkpoint.CheckpointTrackerActor._
-import px.kinesis.stream.consumer.checkpoint.{
-  ShardCheckpointTrackerActor => shard
-}
-import software.amazon.kinesis.processor.RecordProcessorCheckpointer
+import px.kinesis.stream.consumer.checkpoint.{ShardCheckpointTrackerActor => shard}
 import software.amazon.kinesis.retrieval.kpl.ExtendedSequenceNumber
 
 import scala.collection.immutable.Seq
@@ -17,7 +16,7 @@ import scala.collection.immutable.Seq
 class CheckpointTrackerActorSpec
     extends TestKit(ActorSystem("CheckpointTrackerActorSpec"))
     with ImplicitSender
-    with FunSpecLike
+    with AnyFunSpecLike
     with Matchers
     with BeforeAndAfterAll
     with MockFactory {
@@ -39,18 +38,18 @@ class CheckpointTrackerActorSpec
     it("should track successfully after creation of tracker") {
       val tracker = createTracker()
       val shardId = "01"
-      tracker ! Create(shardId)
-      expectMsg(Ack)
+      tracker ! Command.Create(shardId)
+      expectMsg(Response.Ack)
 
-      tracker ! Track(shardId, Seq(1).map(toSequenceNum))
-      expectMsg(shard.Ack)
+      tracker ! Command.Track(shardId, Seq(1).map(toSequenceNum))
+      expectMsg(shard.Response.Ack)
     }
 
     it("should fail if tracker is not active") {
       val tracker = createTracker()
       val shardId = "01"
       // shard tracker for 01 does not exist
-      tracker ! Track(shardId, Seq(1).map(toSequenceNum))
+      tracker ! Command.Track(shardId, Seq(1).map(toSequenceNum))
       expectMsgPF() {
         case Failure(_) => true
       }
@@ -61,27 +60,27 @@ class CheckpointTrackerActorSpec
     it("should process successfully after creation of tracker") {
       val tracker = createTracker()
       val shardId = "01"
-      tracker ! Create(shardId)
-      expectMsg(Ack)
+      tracker ! Command.Create(shardId)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(shardId, toSequenceNum(1))
-      expectMsg(shard.Ack)
+      tracker ! Command.Process(shardId, toSequenceNum(1))
+      expectMsg(shard.Response.Ack)
     }
 
     it("should process successfully even after shard tracker is shutdown") {
       val tracker = createTracker()
       val shardId = "01"
-      tracker ! Create(shardId)
-      expectMsg(Ack)
+      tracker ! Command.Create(shardId)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(shardId, toSequenceNum(1))
-      expectMsg(shard.Ack)
+      tracker ! Command.Process(shardId, toSequenceNum(1))
+      expectMsg(shard.Response.Ack)
 
-      tracker ! Shutdown(shardId)
-      expectMsg(Ack)
+      tracker ! Command.ShutdownShard(shardId)
+      expectMsg(Response.Ack)
 
-      tracker ! Process(shardId, toSequenceNum(2))
-      expectMsg(shard.Ack)
+      tracker ! Command.Process(shardId, toSequenceNum(2))
+      expectMsg(shard.Response.Ack)
 
     }
 

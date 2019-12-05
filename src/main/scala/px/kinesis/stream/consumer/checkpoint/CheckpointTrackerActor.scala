@@ -23,24 +23,23 @@ import px.kinesis.stream.consumer.checkpoint.{
   ShardCheckpointTrackerActor => shard
 }
 
-class CheckpointTrackerActor(workerId: String,
-                             maxBufferSize: Int,
-                             maxDurationInSeconds: Int)
-    extends Actor
-    with ActorLogging {
+class CheckpointTrackerActor(workerId: String, maxBufferSize: Int, maxDurationInSeconds: Int) extends Actor with ActorLogging {
   implicit val ec = context.dispatcher
 
   var trackers = Map.empty[String, TrackerState]
 
   override def receive: Receive = {
-    case Create(shardId) =>
+    case Command.Create(shardId) =>
       startShardTracker(shardId)
-      sender() ! Ack
-    case Track(shardId, sequenceNumbers) =>
-      forward(shardId, shard.Track(sequenceNumbers))
-    case Process(shardId, sequenceNumber) if isTrackerActive(shardId) =>
-      forward(shardId, shard.Process(sequenceNumber))
-    case Process(shardId, sequenceNumber) =>
+      sender() ! Response.Ack
+
+    case Command.Track(shardId, sequenceNumbers) =>
+      forward(shardId, shard.Command.Track(sequenceNumbers))
+
+    case Command.Process(shardId, sequenceNumber) if isTrackerActive(shardId) =>
+      forward(shardId, shard.Command.Process(sequenceNumber))
+
+    case Command.Process(shardId, sequenceNumber) =>
       // Skip out on forwarding the message to trackers, we should just respond to sender immediately
       // This case would occur if the associated tracker was shutdown gracefully due to a shutdown request (possible lease loss)
       log.warning(
@@ -48,30 +47,34 @@ class CheckpointTrackerActor(workerId: String,
         shardId,
         sequenceNumber.toString
       )
-      sender() ! shard.Ack
+      sender() ! shard.Response.Ack // TODO: Can we replace with this actor's ACK?  Its a leaky abstraction to send the Child version
 
-    case CheckpointIfNeeded(shardId, checkpointer, force) =>
-      forward(shardId, shard.CheckpointIfNeeded(checkpointer, force))
-    case WatchCompletion(shardId) =>
-      forward(shardId, shard.WatchCompletion)
-    case Shutdown(shardId) =>
+    case Command.CheckpointIfNeeded(shardId, checkpointer, force) =>
+      forward(shardId, shard.Command.CheckpointIfNeeded(checkpointer, force))
+
+    case Command.WatchCompletion(shardId) =>
+      forward(shardId, shard.Command.WatchCompletion)
+
+    case Command.ShutdownShard(shardId) =>
       shutdownShardTracker(shardId)
-      sender() ! Ack
-    case Shutdown =>
+      sender() ! Response.Ack
+
+    case Command.Shutdown =>
       shutdownChildren()
-    case ChildrenShutdownComplete =>
+
+    case Command.ChildrenShutdownComplete =>
       context.stop(self)
+
     case Terminated(child) =>
       removeShardTracker(child.path.name)
   }
 
-  def shutdownChildren(): Future[ChildrenShutdownComplete.type] = {
+  def shutdownChildren(): Future[Command.ChildrenShutdownComplete] = {
     Future
-      .sequence(
-        context.children.map(r => gracefulStop(r, 5.seconds, shard.Shutdown)))
-      .map(_ => ChildrenShutdownComplete)
+      .sequence(context.children.map(gracefulStop(_, 5.seconds, shard.Command.Shutdown)))
+      .map(_ => Command.ChildrenShutdownComplete)
       .recover {
-        case _ => ChildrenShutdownComplete
+        case _ => Command.ChildrenShutdownComplete
       } pipeTo self
   }
 
@@ -84,6 +87,7 @@ class CheckpointTrackerActor(workerId: String,
     trackers.get(shardId) match {
       case Some(TrackerState(ref, isTerminating)) if !isTerminating =>
         ref.forward(message)
+
       case _ =>
         log.warning("Tracker for {} is not active", shardId)
         sender() ! Failure(
@@ -97,8 +101,7 @@ class CheckpointTrackerActor(workerId: String,
     * @param shardId
     * @return
     */
-  def isTrackerActive(shardId: String): Boolean =
-    trackers.get(shardId).exists(t => !t.isTerminating)
+  def isTrackerActive(shardId: String): Boolean = trackers.get(shardId).exists(t => !t.isTerminating)
 
   /**
     * Start a shard tracker actor
@@ -107,10 +110,9 @@ class CheckpointTrackerActor(workerId: String,
     */
   def startShardTracker(shardId: String): Unit = {
     log.info("Initializing shard tracker for {}", shardId)
-    val ref = context.actorOf(
-      ShardCheckpointTrackerActor
-        .props(shardId, maxBufferSize, maxDurationInSeconds),
-      shardId)
+
+    val ref = context.actorOf(ShardCheckpointTrackerActor.props(shardId, maxBufferSize, maxDurationInSeconds), shardId)
+
     context.watch(ref)
     trackers = trackers + (shardId -> TrackerState(ref))
   }
@@ -131,7 +133,7 @@ class CheckpointTrackerActor(workerId: String,
   def shutdownShardTracker(shardId: String): Unit = {
     trackers.get(shardId).foreach { tracker =>
       trackers = trackers + (shardId -> tracker.copy(isTerminating = true))
-      tracker.ref ! shard.Shutdown
+      tracker.ref ! shard.Command.Shutdown
     }
   }
 
@@ -151,29 +153,31 @@ class CheckpointTrackerActor(workerId: String,
 
 object CheckpointTrackerActor {
   // state
-  private[checkpoint] case class TrackerState(ref: ActorRef,
-                                              isTerminating: Boolean = false)
+  private[checkpoint] case class TrackerState(ref: ActorRef, isTerminating: Boolean = false)
   // commands
-  case class Track(shardId: String,
-                   sequenceNumbers: Iterable[ExtendedSequenceNumber])
-  case class Process(shardId: String, sequenceNumber: ExtendedSequenceNumber)
-  case class CheckpointIfNeeded(shardId: String,
-                                checkpointer: RecordProcessorCheckpointer,
-                                force: Boolean = false)
-  case class Create(shardId: String)
-  case class Shutdown(shardId: String)
-  case object Shutdown
-  case object ChildrenShutdownComplete
-  case class WatchCompletion(shardId: String)
+  sealed trait Command extends Product with Serializable
+  object Command {
+    final case class Track(shardId: String, sequenceNumbers: Iterable[ExtendedSequenceNumber]) extends Command
+    final case class Process(shardId: String, sequenceNumber: ExtendedSequenceNumber) extends Command
+    final case class CheckpointIfNeeded(shardId: String, checkpointer: RecordProcessorCheckpointer, force: Boolean = false) extends Command
+    final case class Create(shardId: String) extends Command
+    final case class ShutdownShard(shardId: String) extends Command
+
+    final case object Shutdown extends Command
+    type Shutdown = Shutdown.type
+
+    final case object ChildrenShutdownComplete extends Command
+    type ChildrenShutdownComplete = ChildrenShutdownComplete.type
+
+    final case class WatchCompletion(shardId: String)
+  }
 
   // responses
-  case object Ack
+  sealed trait Response extends Product with Serializable
+  object Response {
+    final case object Ack extends Response
+  }
 
-  def props(workerId: String,
-            maxBufferSize: Int,
-            maxDurationInSeconds: Int): Props =
-    Props(classOf[CheckpointTrackerActor],
-          workerId,
-          maxBufferSize,
-          maxDurationInSeconds)
+  def props(workerId: String, maxBufferSize: Int, maxDurationInSeconds: Int): Props =
+    Props(new CheckpointTrackerActor(workerId, maxBufferSize, maxDurationInSeconds))
 }
