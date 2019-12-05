@@ -4,8 +4,8 @@
 A wrapper around KCL 2.x which exposes an Akka Streams source to consume messages off of a Kinesis Data Stream.
 
 ## Requirements
-- Scala >= 2.12.x or >= 2.11.12
-- Akka Streams >= 2.5.14
+- Scala 2.12 or 2.13
+- Akka Streams >= 2.6.0
 
 ## Usage
 
