@@ -14,11 +14,11 @@ val scalaSettings = Seq(
   crossScalaVersions := List(scala12, scala13)
 )
 
-val akkaStreamV = "2.6.0"
+val akkaStreamV = "2.6.18"
 
 val dependencySettings = Seq(
   libraryDependencies ++= Seq(
-    "software.amazon.kinesis"     % "amazon-kinesis-client"  % "2.2.6",
+    "software.amazon.kinesis"     % "amazon-kinesis-client"  % "2.3.10",
     "com.typesafe.akka"          %% "akka-stream"            % akkaStreamV,
     "com.typesafe.akka"          %% "akka-slf4j"             % akkaStreamV,
     "ch.qos.logback"              % "logback-classic"        % "1.2.3",
