@@ -94,5 +94,5 @@ lazy val examples = (project in file("examples"))
   .settings(dependencySettings)
   .settings(
     resolvers += Resolver.bintrayRepo("streetcontxt", "maven"),
-    libraryDependencies += "com.streetcontxt" %% "kpl-scala" % "1.0.5"
+    libraryDependencies += "io.github.streetcontxt" %% "kpl-scala" % "2.0.0"
   )
